@@ -121,4 +121,4 @@ export const mockGetCurrentUser = async () => {
 };
 
 // Toggle this to switch between real API and mock API
-export const USE_MOCK_API = false; 
+export const USE_MOCK_API = true; 

@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import LoginForm from '../../features/auth/components/LoginForm';
 import RegisterForm from '../../features/auth/components/RegisterForm';
 import { path } from '../utils/constant';
+import { useAuth } from '../../features/auth/hook/useAuth';
 
 // Tách các menu items thành constant để dễ quản lý
 const MAIN_MENU_ITEMS = [
@@ -51,26 +52,24 @@ const NavItem = memo(({ to, label }) => (
 ));
 
 const UserAvatar = memo(({ userData, showUserMenu, setShowUserMenu }) => (
-  <div className="relative">
-    <button 
-      onClick={() => setShowUserMenu(!showUserMenu)}
-      className="flex items-center gap-2 focus:outline-none group"
-    >
-      <div className="relative w-10 h-10 transform group-hover:scale-105 transition-transform">
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#9370db] to-[#8a2be2] shadow-md"></div>
-        <span className="absolute inset-0.5 flex items-center justify-center bg-[#1a0933] text-[#9370db] text-xl rounded-full">
-          {userData?.name?.charAt(0)?.toUpperCase() || 'U'}
-        </span>
-      </div>
-      <span className="text-white group-hover:text-[#9370db] transition-colors tracking-vn-tight">{userData?.name}</span>
-      <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-white transition-all duration-300 ${showUserMenu ? 'rotate-180 text-[#9370db]' : ''} group-hover:text-[#9370db]`} viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-      </svg>
-    </button>
-  </div>
+  <button 
+    onClick={() => setShowUserMenu(!showUserMenu)}
+    className="flex items-center gap-2 focus:outline-none group"
+  >
+    <div className="relative w-10 h-10 transform group-hover:scale-105 transition-transform">
+      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#9370db] to-[#8a2be2] shadow-md"></div>
+      <span className="absolute inset-0.5 flex items-center justify-center bg-[#1a0933] text-[#9370db] text-xl rounded-full">
+        {userData?.name?.charAt(0)?.toUpperCase() || 'U'}
+      </span>
+    </div>
+    <span className="text-white group-hover:text-[#9370db] transition-colors tracking-vn-tight">{userData?.name}</span>
+    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-white transition-all duration-300 ${showUserMenu ? 'rotate-180 text-[#9370db]' : ''} group-hover:text-[#9370db]`} viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+    </svg>
+  </button>
 ));
 
-const UserMenu = memo(({ isVisible, userMenuRef, items }) => (
+const UserMenu = memo(({ isVisible, userMenuRef, items, onLogout }) => (
   <AnimatePresence>
     {isVisible && (
       <motion.div 
@@ -78,7 +77,7 @@ const UserMenu = memo(({ isVisible, userMenuRef, items }) => (
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="absolute right-0 mt-2 w-56 rounded-lg shadow-xl bg-white/5 border border-white/10 z-10 overflow-hidden"
+        className="absolute top-full right-0 mt-2 w-56 rounded-lg shadow-xl bg-white/5 backdrop-blur-sm border border-white/10 z-[1000] overflow-hidden"
         ref={userMenuRef}
       >
         <div className="py-2">
@@ -93,7 +92,10 @@ const UserMenu = memo(({ isVisible, userMenuRef, items }) => (
             </Link>
           ))}
           <div className="border-t border-white/10 my-1"></div>
-          <button className="flex items-center gap-3 w-full text-left px-4 py-2 text-white hover:bg-white/10 transition-colors tracking-vn-tight">
+          <button 
+            onClick={onLogout}
+            className="flex items-center gap-3 w-full text-left px-4 py-2 text-white hover:bg-white/10 transition-colors tracking-vn-tight"
+          >
             <span className="text-[#9370db]">🚪</span>
             <span>Đăng xuất</span>
           </button>
@@ -124,7 +126,7 @@ const AuthButtons = memo(({ setShowLogin, setShowRegister }) => (
   </>
 ));
 
-const MobileMenu = memo(({ isVisible, items, mobileMenuRef, setIsMobileMenuOpen, isLoggedIn, setShowLogin, setShowRegister }) => (
+const MobileMenu = memo(({ isVisible, items, mobileMenuRef, setIsMobileMenuOpen, isLoggedIn, userData, setShowLogin, setShowRegister, userMenuItems, onLogout }) => (
   <AnimatePresence>
     {isVisible && (
       <motion.div 
@@ -136,6 +138,21 @@ const MobileMenu = memo(({ isVisible, items, mobileMenuRef, setIsMobileMenuOpen,
         className="md:hidden bg-white/5 border-t border-white/10 overflow-hidden"
       >
         <div className="container mx-auto px-4 py-4">
+          {isLoggedIn && userData && (
+            <div className="flex items-center gap-3 p-3 mb-3 bg-white/5 rounded-lg border border-white/10">
+              <div className="relative w-10 h-10">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#9370db] to-[#8a2be2] shadow-md"></div>
+                <span className="absolute inset-0.5 flex items-center justify-center bg-[#1a0933] text-[#9370db] text-xl rounded-full">
+                  {userData?.name?.charAt(0)?.toUpperCase() || 'U'}
+                </span>
+              </div>
+              <div className="flex-1">
+                <div className="font-medium tracking-vn-tight">{userData?.name}</div>
+                <div className="text-sm text-gray-400 tracking-vn-tight">{userData?.email}</div>
+              </div>
+            </div>
+          )}
+          
           <nav className="flex flex-col gap-3">
             {items.map((item, index) => (
               <Link 
@@ -150,7 +167,35 @@ const MobileMenu = memo(({ isVisible, items, mobileMenuRef, setIsMobileMenuOpen,
             ))}
           </nav>
           
-          {!isLoggedIn && (
+          {isLoggedIn ? (
+            <>
+              <div className="border-t border-white/10 my-3"></div>
+              <div className="text-sm text-gray-400 mb-2 px-2 tracking-vn-tight">Tùy chọn người dùng</div>
+              <nav className="flex flex-col gap-2">
+                {userMenuItems.map((item, index) => (
+                  <Link 
+                    key={index} 
+                    to={item.to} 
+                    className="flex items-center gap-3 p-2 text-white hover:bg-white/10 rounded-lg transition-colors tracking-vn-tight"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <span className="w-6 text-center text-[#9370db]">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+                <button 
+                  onClick={() => {
+                    onLogout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-3 p-2 text-white hover:bg-white/10 rounded-lg transition-colors tracking-vn-tight text-left"
+                >
+                  <span className="w-6 text-center text-[#9370db]">🚪</span>
+                  <span>Đăng xuất</span>
+                </button>
+              </nav>
+            </>
+          ) : (
             <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-white/10">
               <button 
                 onClick={() => {
@@ -190,7 +235,13 @@ const Navbar = () => {
   const [showRegister, setShowRegister] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isLoggedIn = false, userData = null } = useSelector(state => state.user || {});
+  
+  const { user } = useSelector(state => state.auth);
+  const { logout } = useAuth();
+  
+  const isLoggedIn = !!user;
+  const userData = user;
+  
   const userMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
 
@@ -222,6 +273,12 @@ const Navbar = () => {
     };
   }, [isMobileMenuOpen]);
 
+  // Xử lý đăng xuất
+  const handleLogout = () => {
+    logout();
+    setShowUserMenu(false);
+  };
+
   // Mobile menu items với icon
   const mobileMenuItems = MAIN_MENU_ITEMS.map((item, index) => ({
     ...item,
@@ -241,7 +298,7 @@ const Navbar = () => {
 
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
-            <>
+            <div className="relative z-[100]">
               <UserAvatar 
                 userData={userData} 
                 showUserMenu={showUserMenu} 
@@ -250,9 +307,10 @@ const Navbar = () => {
               <UserMenu 
                 isVisible={showUserMenu} 
                 userMenuRef={userMenuRef} 
-                items={USER_MENU_ITEMS} 
+                items={USER_MENU_ITEMS}
+                onLogout={handleLogout}
               />
-            </>
+            </div>
           ) : (
             <AuthButtons 
               setShowLogin={setShowLogin}
@@ -282,8 +340,11 @@ const Navbar = () => {
         mobileMenuRef={mobileMenuRef}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         isLoggedIn={isLoggedIn}
+        userData={userData}
         setShowLogin={setShowLogin}
         setShowRegister={setShowRegister}
+        userMenuItems={USER_MENU_ITEMS}
+        onLogout={handleLogout}
       />
 
       <AnimatePresence>
