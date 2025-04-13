@@ -32,10 +32,10 @@ const TarotReading = memo(() => {
       dispatch(fetchAllCards());
     }
     
-    // Đặt timer để ẩn intro sau 3 giây
+    // Đặt timer để ẩn intro sau 2 giây
     const introTimer = setTimeout(() => {
       setShowIntro(false);
-    }, 3000);
+    }, 2000);
     
     return () => clearTimeout(introTimer);
   }, [dispatch, cards]);
@@ -60,7 +60,7 @@ const TarotReading = memo(() => {
           }
           return newCount;
         });
-      }, 150); // Cách nhau 150ms mỗi lá
+      }, 200); // Cách nhau 200ms mỗi lá
       
       return () => clearInterval(dealInterval);
     }
@@ -364,49 +364,6 @@ const TarotReading = memo(() => {
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-4 tracking-vn-tight">
               Trải Bài Tarot
             </h1>
-            <p className="text-gray-300 max-w-2xl mx-auto tracking-vn-tight">
-              Chọn bộ bài, loại trải bài và để năng lượng vũ trụ dẫn dắt bạn. Hãy đặt tâm trí vào câu hỏi của bạn khi chọn bài.
-            </p>
-          </motion.div>
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Lựa chọn bộ bài */}
-            <motion.div 
-              className="bg-white/5 backdrop-blur-sm border border-purple-900/20 rounded-xl p-6 hover:border-[#9370db]/40 transition-colors"
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <h2 className="text-xl font-medium text-white mb-4 tracking-vn-tight flex items-center">
-                <span className="text-2xl mr-2">🎴</span> Chọn Bộ Bài
-              </h2>
-              <div className="space-y-3">
-                {['rider-waite', 'thoth', 'marseille', 'wild-unknown'].map((deck) => (
-                  <motion.button 
-                    key={deck}
-                    className={`w-full py-3 px-4 rounded-lg font-medium text-base tracking-vn-tight flex items-center justify-between transition-all ${
-                      selectedDeckType === deck 
-                        ? 'bg-gradient-to-r from-[#9370db] to-[#8a2be2] text-white shadow-lg shadow-[#9370db]/20' 
-                        : 'bg-white/10 text-gray-200 hover:bg-white/15'
-                    }`}
-                    onClick={() => setSelectedDeckType(deck)}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span>
-                      {deck === 'rider-waite' ? 'Rider Waite Smith' : 
-                       deck === 'thoth' ? 'Thoth Tarot' : 
-                       deck === 'marseille' ? 'Tarot of Marseilles' :
-                       'The Wild Unknown'}
-                    </span>
-                    {selectedDeckType === deck && (
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </motion.button>
-                ))}
-              </div>
             </motion.div>
             
             {/* Lựa chọn loại đọc bài */}
@@ -425,7 +382,6 @@ const TarotReading = memo(() => {
                   { id: 'career', name: 'Sự Nghiệp & Tài Chính', icon: '💼' },
                   { id: 'spiritual', name: 'Phát Triển Bản Thân', icon: '✨' },
                   { id: 'health', name: 'Sức Khỏe & Tinh Thần', icon: '🧘‍♀️' },
-                  { id: 'decisions', name: 'Giải Quyết Vấn Đề', icon: '🔍' }
                 ].map((type) => (
                   <motion.button 
                     key={type.id}
@@ -451,7 +407,7 @@ const TarotReading = memo(() => {
                 ))}
               </div>
             </motion.div>
-          </div>
+        
           
           {/* Nút bắt đầu bói bài */}
           <motion.div 
@@ -500,7 +456,7 @@ const TarotReading = memo(() => {
       
       {readingStep === 'shuffling' && (
         <motion.div 
-          className="space-y-8"
+          className="space-y-4"
           key="shuffling"
           initial="hidden"
           animate="visible"
@@ -508,7 +464,7 @@ const TarotReading = memo(() => {
           variants={fadeVariants}
         >
           <motion.div 
-            className="bg-white/5 backdrop-blur-sm border border-purple-900/20 rounded-xl p-8"
+            className="bg-white/5 backdrop-blur-sm border border-purple-900/2 rounded-xl p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}

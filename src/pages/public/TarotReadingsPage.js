@@ -110,7 +110,7 @@ const TarotReadingsPage = () => {
       description="Khám phá các loại hình bói Tarot online chính xác - từ tình yêu, sự nghiệp đến sức khỏe và phát triển bản thân."
     >
       {/* Hero Section */}
-      <div className="text-center mb-16">
+      <div className="text-center mb-5">
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-vn-tight">
           Khám Phá <span className="text-[#9370db]">Bói Tarot</span> Online
         </h1>
@@ -129,7 +129,7 @@ const TarotReadingsPage = () => {
               Bắt đầu xem bói ngay
             </Button>
           ) : (
-            <div className="max-w-3xl mx-auto">
+            <div className="max">
               <TarotReading />
             </div>
           )}

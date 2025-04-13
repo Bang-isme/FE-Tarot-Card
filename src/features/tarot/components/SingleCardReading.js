@@ -22,8 +22,8 @@ const SingleCardReading = memo(({
   // Tạo bộ bài ảo
   useEffect(() => {
     if (card) {
-      // Tạo 30 lá bài ảo để tạo hiệu ứng shuffle
-      const dummyCards = Array.from({ length: 30 }, (_, index) => ({
+      // Tạo 78 lá bài ảo để tạo hiệu ứng shuffle
+      const dummyCards = Array.from({ length: 78 }, (_, index) => ({
         id: `dummy-${index}`,
         name: 'Tarot Card',
         imageUrl: null

@@ -143,7 +143,6 @@ const Footer = () => {
     { to: "/career", label: "Bói sự nghiệp", icon: "💼" },
     { to: "/health", label: "Bói sức khỏe", icon: "🩺" },
     { to: "/daily", label: "Bói hàng ngày", icon: "📆" },
-    { to: "/yearly", label: "Bói năm mới", icon: "🎊" }
   ];
 
   return (
