@@ -1,38 +1,73 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginForm from '../../features/auth/components/LoginForm';
 import RegisterForm from '../../features/auth/components/RegisterForm';
+import ForgotPasswordForm from '../../features/auth/components/ForgotPasswordForm';
+import ResetPasswordForm from '../../features/auth/components/ResetPasswordForm';
 import { useAuth } from '../../features/auth/hook/useAuth';
-import { path } from '../../shared/utils/constant';
+import { path } from '../../shared/utils/routes';
 
 const AuthPage = () => {
-  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [authMode, setAuthMode] = useState('login');
   const location = useLocation();
   const navigate = useNavigate();
+  const params = useParams();
   const { isAuthenticated } = useAuth();
+  const [message, setMessage] = useState('');
+  
+  // Extract redirect info from location state
+  const from = location.state?.from || path.PROTECTED.DASHBOARD;
+  
+  useEffect(() => {
+    // Set message from location state if it exists
+    if (location.state?.message) {
+      setMessage(location.state.message);
+    }
+  }, [location.state]);
   
   // Check if user is already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate(path.PROTECTED.DASHBOARD);
+    if (isAuthenticated && authMode !== 'reset-password') {
+      // Navigate to the 'from' path if it exists, otherwise to dashboard
+      navigate(from);
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, authMode, from]);
   
   // Determine mode based on URL
   useEffect(() => {
+    console.log('Current path:', location.pathname);
+    
     if (location.pathname === path.AUTH.LOGIN) {
-      setIsLoginMode(true);
+      console.log('Setting auth mode to login');
+      setAuthMode('login');
     } else if (location.pathname === path.AUTH.REGISTER) {
-      setIsLoginMode(false);
+      console.log('Setting auth mode to register');
+      setAuthMode('register');
+    } else if (location.pathname === path.AUTH.FORGOT_PASSWORD) {
+      console.log('Setting auth mode to forgot-password');
+      setAuthMode('forgot-password');
+    } else if (location.pathname.startsWith('/reset-password/')) {
+      console.log('Setting auth mode to reset-password');
+      setAuthMode('reset-password');
     }
   }, [location.pathname]);
   
-  const handleSwitchMode = () => {
-    if (isLoginMode) {
-      navigate(path.AUTH.REGISTER);
-    } else {
-      navigate(path.AUTH.LOGIN);
+  const handleSwitchMode = (mode) => {
+    console.log('Switching mode to:', mode);
+    
+    switch (mode) {
+      case 'login':
+        navigate(path.AUTH.LOGIN, { state: { from, message } });
+        break;
+      case 'register':
+        navigate(path.AUTH.REGISTER, { state: { from, message } });
+        break;
+      case 'forgot-password':
+        navigate(path.AUTH.FORGOT_PASSWORD, { state: { from, message } });
+        break;
+      default:
+        navigate(path.AUTH.LOGIN, { state: { from, message } });
     }
   };
   
@@ -50,7 +85,7 @@ const AuthPage = () => {
       </div>
       
       <AnimatePresence mode="wait">
-        {isLoginMode ? (
+        {authMode === 'login' && (
           <motion.div
             key="login"
             initial={{ opacity: 0, y: 20 }}
@@ -61,10 +96,15 @@ const AuthPage = () => {
           >
             <LoginForm 
               onClose={handleClose} 
-              onSwitchToRegister={handleSwitchMode} 
+              onSwitchToRegister={() => handleSwitchMode('register')}
+              onSwitchToForgotPassword={() => handleSwitchMode('forgot-password')}
+              message={message}
+              redirectPath={from}
             />
           </motion.div>
-        ) : (
+        )}
+        
+        {authMode === 'register' && (
           <motion.div
             key="register"
             initial={{ opacity: 0, y: 20 }}
@@ -75,7 +115,40 @@ const AuthPage = () => {
           >
             <RegisterForm 
               onClose={handleClose} 
-              onSwitchToLogin={handleSwitchMode} 
+              onSwitchToLogin={() => handleSwitchMode('login')}
+              message={message}
+              redirectPath={from}
+            />
+          </motion.div>
+        )}
+        
+        {authMode === 'forgot-password' && (
+          <motion.div
+            key="forgot-password"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="w-full max-w-md mx-auto"
+          >
+            <ForgotPasswordForm 
+              onClose={handleClose} 
+              onSwitchToLogin={() => handleSwitchMode('login')}
+            />
+          </motion.div>
+        )}
+        
+        {authMode === 'reset-password' && (
+          <motion.div
+            key="reset-password"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="w-full max-w-md mx-auto"
+          >
+            <ResetPasswordForm 
+              onClose={handleClose}
             />
           </motion.div>
         )}

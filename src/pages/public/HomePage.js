@@ -4,18 +4,72 @@ import { motion } from 'framer-motion';
 import PageLayout from '../../shared/layouts/PageLayout';
 import { Button } from '../../shared/components/common';
 
-// Animated Tarot Deck Component
+// Thay thế component TarotDeck bằng version đơn giản hơn
 const TarotDeck = () => {
-  const [shuffling, setShuffling] = useState(false);
-
-  const handleShuffle = () => {
-    setShuffling(true);
-    setTimeout(() => setShuffling(false), 1200);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [nextCardIndex, setNextCardIndex] = useState(1);
+  const cardRef = useRef(null);
+  
+  // Danh sách các lá bài để luân phiên hiển thị
+  const cards = [
+    { 
+      name: "The Fool",
+      frontImage: "https://res.cloudinary.com/dfp2ne3nn/image/upload/v1745522725/TheFool_ewfg71.png" 
+    },
+    { 
+      name: "The Magician",
+      frontImage: "https://res.cloudinary.com/dfp2ne3nn/image/upload/v1745522729/TheMagician_fqzyrb.png" 
+    },
+    { 
+      name: "The High Priestess",
+      frontImage: "https://res.cloudinary.com/dfp2ne3nn/image/upload/v1745522727/TheHighPriestess_epsoay.png" 
+    },
+    { 
+      name: "The Empress",
+      frontImage: "https://res.cloudinary.com/dfp2ne3nn/image/upload/v1745522725/TheEmpress_zszjpa.png" 
+    },
+    { 
+      name: "The Emperor",
+      frontImage: "https://res.cloudinary.com/dfp2ne3nn/image/upload/v1745522745/TheEmperor_y1vfjk.png"
+    }
+  ];
+  
+  // Hình ảnh mặt sau đồng nhất cho tất cả các lá bài
+  const cardBack = "https://res.cloudinary.com/dfp2ne3nn/image/upload/v1747154079/card-back_qn7bss.png";
+  
+  // Thiết lập animationend listener để thay đổi lá bài khi xoay đến mặt sau
+  useEffect(() => {
+    const changeCardOnRotation = () => {
+      // Sử dụng một đoạn animation riêng biệt để phát hiện khi lá bài xoay đến 180 độ (mặt sau)
+      const flipAnimationDuration = 4000; // Nửa chu kỳ xoay (8s/2)
+      
+      const flipTimer = setTimeout(() => {
+        setCurrentCardIndex(prevIndex => {
+          const newIndex = (prevIndex + 1) % cards.length;
+          // Cập nhật nextCardIndex cho lá bài tiếp theo
+          setNextCardIndex((newIndex + 1) % cards.length);
+          return newIndex;
+        });
+      }, flipAnimationDuration);
+      
+      return () => clearTimeout(flipTimer);
     };
-
-    return (
+    
+    // Thiết lập chu kỳ đổi lá bài đồng bộ với chu kỳ animation
+    const rotationCycle = setInterval(changeCardOnRotation, 8000);
+    
+    // Kích hoạt ngay lập tức cho lần đầu tiên
+    const initialFlip = changeCardOnRotation();
+    
+    return () => {
+      clearInterval(rotationCycle);
+      if (initialFlip) initialFlip();
+    };
+  }, [cards.length]);
+  
+  return (
     <div className="relative bg-gradient-to-br from-[#1a0933] to-[#2a1045] rounded-xl p-6 h-full min-h-[420px] flex flex-col items-center justify-center overflow-hidden border border-[#9370db]/30">
-      {/* Decorative stars */}
+      {/* Hiệu ứng ngôi sao nền */}
       <div className="absolute inset-0 overflow-hidden">
         {Array.from({ length: 20 }).map((_, i) => (
           <div
@@ -29,66 +83,94 @@ const TarotDeck = () => {
             }}
           />
         ))}
-                            </div>
+      </div>
       
-      {/* Moon decoration in background */}
+      {/* Mặt trăng nền */}
       <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gradient-to-r from-yellow-200 to-yellow-400 opacity-70 shadow-lg shadow-yellow-300/30"></div>
       
-      {/* Tarot deck */}
-      <div className="relative w-48 h-80 mx-auto mb-4">
-        {/* Card stack effect (3 cards behind the main card) */}
-        <div 
-          className={`absolute -bottom-1 left-1 w-full h-full bg-gradient-to-br from-[#FFD700]/90 to-[#FFA500]/90 rounded-lg border-2 border-[#FFD700] transform ${shuffling ? 'rotate-[-8deg] translate-x-6' : 'rotate-[-4deg]'} transition-all duration-500 shadow-lg`} 
-        />
-        <div 
-          className={`absolute -bottom-0.5 left-0.5 w-full h-full bg-gradient-to-br from-[#FFD700]/90 to-[#FFA500]/90 rounded-lg border-2 border-[#FFD700] transform ${shuffling ? 'rotate-[-4deg] translate-x-3' : 'rotate-[-2deg]'} transition-all duration-500 shadow-lg`} 
-        />
-        <div 
-          className={`absolute bottom-0 left-0 w-full h-full bg-gradient-to-br from-[#FFD700]/90 to-[#FFA500]/90 rounded-lg border-2 border-[#FFD700] transform ${shuffling ? 'rotate-[2deg] translate-x-1' : 'rotate-[0deg]'} transition-all duration-500 shadow-lg`} 
-        />
-        
-        {/* Main card with hover effects */}
-        <div 
-          className={`relative w-full h-full bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-lg border-2 border-[#FFD700] shadow-xl transform ${
-            shuffling ? 'rotate-[8deg] translate-y-[-5px]' : 'rotate-0 hover:rotate-[2deg] hover:translate-y-[-10px]'
-          } transition-all duration-500 cursor-pointer group`} 
-        >
-          {/* Card content */}
-          <div className="absolute inset-0 m-1 bg-gradient-to-br from-[#0d0221] to-[#190934] rounded-md flex flex-col items-center justify-center p-4">
-            {/* Moon icon in top left */}
-            <div className="absolute top-2 left-2 text-yellow-300 text-lg">☽</div>
-            
-            {/* Moon icon in bottom right */}
-            <div className="absolute bottom-2 right-2 text-yellow-300 text-lg transform rotate-180">☽</div>
-            
-            {/* Tarot symbol */}
-            <div className="text-6xl mb-4 text-yellow-300 animate-pulse-slow">🌙</div>
-            
-            {/* Decorative stars */}
-            <div className="absolute top-1/4 left-1/4 text-yellow-300 text-xs animate-float-y">✧</div>
-            <div className="absolute bottom-1/3 right-1/4 text-yellow-300 text-xs animate-float-x">✦</div>
-            
-            {/* Decorative border */}
-            <div className="absolute inset-3 border border-yellow-500/30 rounded-md pointer-events-none"></div>
-                                                </div>
-                                            </div>
-                                        </div>
+      {/* CSS để tạo animation xoay liên tục */}
+      <style>
+        {`
+          @keyframes continuousRotate {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(360deg); }
+          }
+          
+          .tarot-card {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            animation: continuousRotate 8s linear infinite;
+          }
+          
+          .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 0.5rem;
+            border: 2px solid #FFD700;
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          }
+          
+          .card-front {
+            transform: rotateY(0deg);
+          }
+          
+          .card-back {
+            transform: rotateY(180deg);
+          }
+        `}
+      </style>
       
-      {/* Shuffle button */}
-      <button 
-        onClick={handleShuffle}
-        disabled={shuffling}
-        className="bg-gradient-to-r from-[#9370db] to-[#8a2be2] text-white py-2 px-4 rounded-full shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 transition-all duration-300 transform hover:translate-y-[-2px] active:translate-y-0 mb-4"
-      >
-        Trộn bài
-        <span className="ml-2">🔀</span>
-      </button>
+      {/* Lá bài xoay */}
+      <div className="perspective-1000 w-64 h-[360px] my-4 mx-auto">
+        <div className="tarot-card" ref={cardRef}>
+          {/* Mặt trước lá bài - hiển thị lá hiện tại */}
+          <div className="card-face card-front">
+            <img 
+              src={cards[currentCardIndex].frontImage} 
+              alt={cards[currentCardIndex].name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.src = "https://via.placeholder.com/300x450/2a1045/9370db?text=Tarot+Card";
+              }}
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+              <h3 className="text-white text-center font-medium">{cards[currentCardIndex].name}</h3>
+            </div>
+          </div>
+          
+          {/* Mặt sau lá bài - dùng hình mặt sau nhưng cũng chuẩn bị sẵn lá tiếp theo */}
+          <div className="card-face card-back">
+            <img 
+              src={cardBack} 
+              alt="Card Back" 
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.src = "https://via.placeholder.com/300x450/2a1045/9370db?text=Card+Back";
+              }}
+            />
+            
+            {/* Tiếp theo sẽ hiện lá này */}
+            <div className="hidden">
+              <img 
+                src={cards[nextCardIndex].frontImage} 
+                alt={cards[nextCardIndex].name}
+                loading="eager"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
       
-      {/* Quote */}
+      {/* Dòng text thông tin */}
       <p className="text-center text-gray-300 italic text-sm mt-2 max-w-xs">
         "Mỗi lá bài là một cánh cửa mở ra thế giới nội tâm của bạn"
       </p>
-                                    </div>
+    </div>
   );
 };
 

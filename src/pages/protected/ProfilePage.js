@@ -1,9 +1,26 @@
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import Navbar from '../../shared/ui/NavBar';
 import Footer from '../../shared/ui/Footer';
+import { fetchCurrentUser } from '../../features/auth/slices/authSlice';
+import axios from 'axios';
+import { API_URL, CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from '../../config/constants';
+
+// Tạo axiosInstance với cấu hình đúng
+const axiosInstance = axios.create({
+  baseURL: API_URL
+});
+
+// Set token khi component mount
+const setAuthHeader = () => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    return { 'Authorization': `Bearer ${token}` };
+  }
+  return {};
+};
 
 // Components
 const SectionTitle = memo(({ title, subtitle, centered = false, light = true }) => (
@@ -16,7 +33,7 @@ const SectionTitle = memo(({ title, subtitle, centered = false, light = true }) 
   </div>
 ));
 
-const ProfileInfoItem = memo(({ label, value, icon, isEditing, onChange, name }) => (
+const ProfileInfoItem = memo(({ label, value, icon, isEditing, onChange, name, type = "text" }) => (
   <div className="mb-6">
     <label className="block text-[#9370db] mb-2 text-sm font-medium tracking-vn-tight flex items-center">
       <span className="mr-2 text-[#9370db]">{icon}</span>
@@ -24,7 +41,7 @@ const ProfileInfoItem = memo(({ label, value, icon, isEditing, onChange, name })
     </label>
     {isEditing ? (
       <input
-        type="text"
+        type={type}
         value={value}
         onChange={(e) => onChange(name, e.target.value)}
         className="w-full px-4 py-2 bg-white/10 backdrop-blur-sm border border-purple-900/30 rounded-lg text-white focus:outline-none focus:border-[#9370db] transition-colors tracking-vn-tight"
@@ -83,16 +100,62 @@ const MysticBackground = memo(() => (
 ));
 
 const ProfilePage = () => {
-  // Thông tin người dùng mẫu - trong thực tế sẽ lấy từ Redux store
+  const dispatch = useDispatch();
+  const { user, loading, error } = useSelector((state) => state.auth);
   const [isEditing, setIsEditing] = useState(false);
   const [userProfile, setUserProfile] = useState({
-    name: "Nguyễn Văn A",
-    email: "nguyenvana@example.com",
-    phone: "0912345678",
-    birthdate: "1990-01-01",
-    address: "Hà Nội, Việt Nam",
-    bio: "Tôi đam mê Tarot và muốn tìm hiểu thêm về nó. Đây là hành trình khám phá bản thân của tôi thông qua các lá bài."
+    name: "",
+    email: "",
+    phone: "",
+    birthdate: "",
+    address: "",
+    bio: "",
+    avatar: ""
   });
+  const [profileError, setProfileError] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef(null);
+  
+  // Sử dụng useRef thay vì useState để không gây re-render
+  const hasInitialized = useRef(false);
+
+  // Fetch user data when component mounts - chỉ thực hiện 1 lần
+  useEffect(() => {
+    // Chỉ fetch dữ liệu khi component đầu tiên được mount và chưa từng fetch
+    if (!hasInitialized.current && user === null) {
+      const fetchData = async () => {
+        try {
+          await dispatch(fetchCurrentUser()).unwrap();
+          setProfileError(null);
+        } catch (err) {
+          console.error("Error fetching user profile:", err);
+          setProfileError("Không thể tải thông tin người dùng. Vui lòng thử lại sau.");
+        }
+      };
+      
+      fetchData();
+      hasInitialized.current = true;
+    }
+  }, [dispatch, user]);
+
+  // Update local state when user data changes
+  useEffect(() => {
+    if (user) {
+      console.log("User data received:", user);
+      setUserProfile({
+        name: user.profile?.full_name || user.username || "",
+        email: user.email || "",
+        phone: user.profile?.phone_number || "",
+        birthdate: user.profile?.birth_date || "",
+        address: user.profile?.city && user.profile?.country ? 
+          `${user.profile.city}, ${user.profile.country}` : 
+          (user.profile?.country || ""),
+        bio: user.profile?.bio || "",
+        avatar: user.profile?.avatar_url || ""
+      });
+    }
+  }, [user]);
 
   // Recent readings - trong thực tế sẽ lấy từ API
   const recentReadings = [
@@ -119,6 +182,7 @@ const ProfilePage = () => {
     }
   ];
 
+  // Danh sách huy hiệu - trong thực tế sẽ lấy từ API
   const badges = [
     {
       title: "Nhà Khám Phá",
@@ -157,11 +221,152 @@ const ProfilePage = () => {
     });
   };
 
-  const handleSaveProfile = () => {
-    // Trong thực tế, gọi API để cập nhật profile
-    console.log("Saving profile:", userProfile);
-    setIsEditing(false);
+  const handleRetry = () => {
+    setProfileError(null);
+    dispatch(fetchCurrentUser());
   };
+
+  const handleAvatarClick = () => {
+    if (isEditing) {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      setProfileError(null);
+      
+      // Log file info
+      console.log('File selected:', file.name, file.type, file.size);
+      
+      // Tạo URL ảnh giả để test trước
+      // Thêm ảnh tạm thời từ file đã chọn
+      const tempImageUrl = URL.createObjectURL(file);
+      
+      // Cập nhật state với URL tạm thời
+      setUserProfile({
+        ...userProfile,
+        avatar: tempImageUrl
+      });
+      
+      setProfileError("Đã tải lên ảnh tạm thời. Chức năng upload sẽ được hoàn thiện trong phiên bản tiếp theo.");
+      setIsUploading(false);
+      
+      // Thông báo cho người dùng
+      console.log('Using temporary local file URL instead of uploading to Cloudinary');
+      
+      /* Chức năng upload sẽ được cập nhật sau khi cấu hình Cloudinary được hoàn tất
+      // Tạo form data để upload lên Cloudinary
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'ml_default');
+      
+      // URL upload API với cloud name
+      const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+      
+      // Upload file lên Cloudinary
+      const uploadResponse = await axios.post(uploadUrl, formData);
+
+      // Lấy URL ảnh đã upload
+      const imageUrl = uploadResponse.data.secure_url;
+      
+      // Cập nhật state
+      setUserProfile({
+        ...userProfile,
+        avatar: imageUrl
+      });
+      */
+    } catch (error) {
+      console.error("Error handling file:", error);
+      setProfileError("Không thể xử lý file ảnh. Vui lòng thử lại hoặc chọn file khác.");
+      setIsUploading(false);
+    }
+  };
+
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return "";
+    
+    // Chuyển đổi định dạng ngày tháng thành YYYY-MM-DD cho input type="date"
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      console.log("Saving profile:", userProfile);
+      
+      // Chuyển đổi dữ liệu để phù hợp với API
+      const profileData = {
+        fullName: userProfile.name,
+        bio: userProfile.bio,
+        phoneNumber: userProfile.phone,
+        birthDate: userProfile.birthdate,
+        avatarUrl: userProfile.avatar,
+        // Phân tách địa chỉ thành city và country nếu có dấu phẩy
+        ...(userProfile.address && userProfile.address.includes(',') 
+          ? {
+              city: userProfile.address.split(',')[0].trim(),
+              country: userProfile.address.split(',')[1].trim()
+            }
+          : { country: userProfile.address })
+      };
+      
+      console.log("Sending profile data to API:", profileData);
+      console.log("Headers:", setAuthHeader());
+      
+      // Gọi API cập nhật profile với axiosInstance
+      const headers = setAuthHeader();
+      const response = await axiosInstance.put('/api/users/profile', profileData, { headers });
+      
+      console.log("Profile update response:", response);
+      
+      // Cập nhật lại dữ liệu người dùng
+      dispatch(fetchCurrentUser());
+      
+      // Tắt chế độ chỉnh sửa
+      setIsEditing(false);
+      setProfileError(null);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      
+      // Hiển thị thông báo lỗi chi tiết từ server nếu có
+      if (error.response) {
+        // Server trả về lỗi với status code
+        console.error("Server responded with error:", error.response);
+        const errorMessage = error.response.data?.message || "Cập nhật thông tin không thành công. Vui lòng thử lại.";
+        setProfileError(errorMessage);
+      } else if (error.request) {
+        // Không nhận được phản hồi từ server
+        console.error("No response received:", error.request);
+        setProfileError("Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.");
+      } else {
+        // Lỗi trong quá trình thiết lập request
+        setProfileError("Cập nhật thông tin không thành công: " + error.message);
+      }
+    }
+  };
+
+  // JSX phần hiển thị nút thử lại
+  const retryButton = (
+    <div className="bg-red-500/20 border border-red-500/30 p-4 rounded-lg text-white text-center">
+      <p>{profileError}</p>
+      <button 
+        onClick={handleRetry}
+        className="mt-4 bg-white/10 text-white px-4 py-2 rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight"
+      >
+        Thử lại
+      </button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1a0933] to-[#0f051d] text-white relative overflow-hidden">
@@ -176,264 +381,322 @@ const ProfilePage = () => {
       {/* Profile Section */}
       <section className="relative pt-32 pb-16 px-4 md:px-8">
         <div className="container mx-auto max-w-5xl relative z-10">
-          <div className="flex flex-col md:flex-row gap-10">
-            {/* Left Column - Profile Info */}
-            <div className="w-full md:w-2/3 space-y-8">
-              <div className="flex items-center justify-between mb-6">
-                <SectionTitle 
-                  title="Hồ Sơ Cá Nhân" 
-                  subtitle="Thông tin và cài đặt tài khoản của bạn"
-                />
-                
-                {isEditing ? (
-                  <div className="flex gap-3">
+          {loading ? (
+            <div className="flex justify-center items-center h-48">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9370db]"></div>
+            </div>
+          ) : profileError ? (
+            retryButton
+          ) : (
+            <div className="flex flex-col md:flex-row gap-10">
+              {/* Left Column - Profile Info */}
+              <div className="w-full md:w-2/3 space-y-8">
+                <div className="flex items-center justify-between mb-6">
+                  <SectionTitle 
+                    title="Hồ Sơ Cá Nhân" 
+                    subtitle="Thông tin và cài đặt tài khoản của bạn"
+                  />
+                  
+                  {isEditing ? (
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={handleSaveProfile}
+                        className="bg-gradient-to-r from-[#9370db] to-[#8a2be2] text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-shadow tracking-vn-tight"
+                      >
+                        Lưu
+                      </button>
+                      <button 
+                        onClick={() => setIsEditing(false)}
+                        className="bg-white/10 text-white px-4 py-2 rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight"
+                      >
+                        Hủy
+                      </button>
+                    </div>
+                  ) : (
                     <button 
-                      onClick={handleSaveProfile}
-                      className="bg-gradient-to-r from-[#9370db] to-[#8a2be2] text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-shadow tracking-vn-tight"
-                    >
-                      Lưu
-                    </button>
-                    <button 
-                      onClick={() => setIsEditing(false)}
+                      onClick={() => setIsEditing(true)}
                       className="bg-white/10 text-white px-4 py-2 rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight"
                     >
-                      Hủy
+                      Chỉnh sửa
                     </button>
-                  </div>
-                ) : (
-                  <button 
-                    onClick={() => setIsEditing(true)}
-                    className="bg-white/10 text-white px-4 py-2 rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight"
-                  >
-                    Chỉnh sửa
-                  </button>
-                )}
-              </div>
-              
-              <div className="bg-white/5 backdrop-blur-sm border border-purple-900/20 p-6 rounded-xl">
-                <div className="flex items-center mb-6">
-                  <div className="relative mr-6">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-r from-[#9370db] to-[#8a2be2] flex items-center justify-center">
-                      <span className="text-white text-3xl font-medium">{userProfile.name.charAt(0)}</span>
-                    </div>
-                    {isEditing && (
-                      <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#9370db] flex items-center justify-center hover:bg-[#8a2be2] transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-white tracking-vn-tight">{userProfile.name}</h3>
-                    <p className="text-gray-400 tracking-vn-tight">Thành viên từ {new Date().toLocaleDateString('vi-VN')}</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <ProfileInfoItem 
-                    label="Họ và tên" 
-                    value={userProfile.name} 
-                    icon="👤"
-                    isEditing={isEditing}
-                    onChange={handleProfileChange}
-                    name="name"
-                  />
-                  <ProfileInfoItem 
-                    label="Email" 
-                    value={userProfile.email} 
-                    icon="📧"
-                    isEditing={isEditing}
-                    onChange={handleProfileChange}
-                    name="email"
-                  />
-                  <ProfileInfoItem 
-                    label="Số điện thoại" 
-                    value={userProfile.phone} 
-                    icon="📱"
-                    isEditing={isEditing}
-                    onChange={handleProfileChange}
-                    name="phone"
-                  />
-                  <ProfileInfoItem 
-                    label="Ngày sinh" 
-                    value={userProfile.birthdate} 
-                    icon="🎂"
-                    isEditing={isEditing}
-                    onChange={handleProfileChange}
-                    name="birthdate"
-                  />
-                  <ProfileInfoItem 
-                    label="Địa chỉ" 
-                    value={userProfile.address} 
-                    icon="🏠"
-                    isEditing={isEditing}
-                    onChange={handleProfileChange}
-                    name="address"
-                  />
-                </div>
-                
-                <div className="mt-6">
-                  <label className="block text-[#9370db] mb-2 text-sm font-medium tracking-vn-tight flex items-center">
-                    <span className="mr-2 text-[#9370db]">📝</span>
-                    Giới thiệu về bản thân
-                  </label>
-                  {isEditing ? (
-                    <textarea
-                      value={userProfile.bio}
-                      onChange={(e) => handleProfileChange("bio", e.target.value)}
-                      rows={4}
-                      className="w-full px-4 py-2 bg-white/10 backdrop-blur-sm border border-purple-900/30 rounded-lg text-white focus:outline-none focus:border-[#9370db] transition-colors tracking-vn-tight"
-                    ></textarea>
-                  ) : (
-                    <div className="px-4 py-3 bg-white/5 backdrop-blur-sm border border-purple-900/20 rounded-lg text-white tracking-vn-tight min-h-20">
-                      {userProfile.bio || 'Chưa cập nhật'}
-                    </div>
                   )}
                 </div>
-              </div>
-              
-              {/* Account Security Section */}
-              <div className="bg-white/5 backdrop-blur-sm border border-purple-900/20 p-6 rounded-xl">
-                <h3 className="text-xl font-bold text-white tracking-vn-tight mb-4">Bảo mật tài khoản</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
-                    <div>
-                      <p className="text-white tracking-vn-tight">Đổi mật khẩu</p>
-                      <p className="text-sm text-gray-400 tracking-vn-tight">Cập nhật mật khẩu để bảo vệ tài khoản</p>
-                    </div>
-                    <button className="bg-white/10 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight text-sm">
-                      Đổi mật khẩu
-                    </button>
-                  </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
-                    <div>
-                      <p className="text-white tracking-vn-tight">Xác thực hai yếu tố</p>
-                      <p className="text-sm text-gray-400 tracking-vn-tight">Thêm lớp bảo mật cho tài khoản</p>
-                    </div>
-                    <button className="bg-white/10 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight text-sm">
-                      Thiết lập
-                    </button>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-white tracking-vn-tight">Phiên đăng nhập</p>
-                      <p className="text-sm text-gray-400 tracking-vn-tight">Quản lý các thiết bị đang đăng nhập</p>
-                    </div>
-                    <button className="bg-white/10 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight text-sm">
-                      Xem thiết bị
-                    </button>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Recent Readings Section */}
-              <div className="bg-white/5 backdrop-blur-sm border border-purple-900/20 p-6 rounded-xl">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-white tracking-vn-tight">Lịch sử xem gần đây</h3>
-                  <Link to="/reading-history" className="text-[#9370db] hover:text-white transition-colors text-sm tracking-vn-tight">
-                    Xem tất cả
-                  </Link>
-                </div>
                 
-                <div className="space-y-4">
-                  {recentReadings.map(reading => (
-                    <TarotSessionItem 
-                      key={reading.id}
-                      date={reading.date}
-                      reading={reading.reading}
-                      image={reading.image}
-                      result={reading.result}
+                <div className="bg-white/5 backdrop-blur-sm border border-purple-900/20 p-6 rounded-xl">
+                  {profileError && (
+                    <div className="mb-6 bg-red-500/20 border border-red-500/30 p-4 rounded-lg text-white text-center">
+                      <p>{profileError}</p>
+                      <button 
+                        onClick={() => setProfileError(null)}
+                        className="mt-2 bg-white/10 text-white px-3 py-1 text-sm rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight"
+                      >
+                        Đóng
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center mb-6">
+                    <div className="relative mr-6">
+                      {/* File input hidden */}
+                      <input 
+                        ref={fileInputRef}
+                        type="file" 
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFileChange} 
+                      />
+                      
+                      {/* Avatar display */}
+                      <div 
+                        onClick={handleAvatarClick}
+                        className={`w-24 h-24 rounded-full ${isEditing ? 'cursor-pointer' : ''} overflow-hidden relative ${
+                          isEditing ? 'hover:opacity-80 transition-opacity' : ''
+                        }`}
+                      >
+                        {userProfile.avatar ? (
+                          <img 
+                            src={userProfile.avatar} 
+                            alt={userProfile.name} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-r from-[#9370db] to-[#8a2be2] flex items-center justify-center">
+                            <span className="text-white text-3xl font-medium">{userProfile.name.charAt(0).toUpperCase()}</span>
+                          </div>
+                        )}
+                        
+                        {/* Upload progress */}
+                        {isUploading && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <div className="w-16 h-16 relative">
+                              <svg className="w-full h-full" viewBox="0 0 100 100">
+                                <circle
+                                  cx="50"
+                                  cy="50"
+                                  r="45"
+                                  fill="none"
+                                  stroke="#9370db"
+                                  strokeWidth="8"
+                                  strokeDasharray="283"
+                                  strokeDashoffset={283 - (283 * uploadProgress) / 100}
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                              <span className="absolute inset-0 flex items-center justify-center text-white text-xs">
+                                {uploadProgress}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Camera button for avatar upload in edit mode */}
+                      {isEditing && (
+                        <button 
+                          onClick={handleAvatarClick}
+                          className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#9370db] flex items-center justify-center hover:bg-[#8a2be2] transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white tracking-vn-tight">{userProfile.name}</h3>
+                      <p className="text-gray-400 tracking-vn-tight">Thành viên từ {new Date().toLocaleDateString('vi-VN')}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <ProfileInfoItem 
+                      label="Họ và tên" 
+                      value={userProfile.name} 
+                      icon="👤"
+                      isEditing={isEditing}
+                      onChange={handleProfileChange}
+                      name="name"
                     />
-                  ))}
+                    <ProfileInfoItem 
+                      label="Email" 
+                      value={userProfile.email} 
+                      icon="📧"
+                      isEditing={isEditing}
+                      onChange={handleProfileChange}
+                      name="email"
+                    />
+                    <ProfileInfoItem 
+                      label="Số điện thoại" 
+                      value={userProfile.phone} 
+                      icon="📱"
+                      isEditing={isEditing}
+                      onChange={handleProfileChange}
+                      name="phone"
+                    />
+                    <ProfileInfoItem 
+                      label="Ngày sinh" 
+                      icon="🎂"
+                      isEditing={isEditing}
+                      onChange={handleProfileChange}
+                      name="birthdate"
+                      type="date"
+                      // Nếu đang chỉnh sửa, hiển thị ngày theo định dạng YYYY-MM-DD cho input type="date"
+                      value={isEditing ? formatDateForInput(userProfile.birthdate) : (userProfile.birthdate ? new Date(userProfile.birthdate).toLocaleDateString('vi-VN') : '')}
+                    />
+                    <ProfileInfoItem 
+                      label="Địa chỉ" 
+                      value={userProfile.address} 
+                      icon="🏠"
+                      isEditing={isEditing}
+                      onChange={handleProfileChange}
+                      name="address"
+                    />
+                  </div>
+                  
+                  <div className="mt-6">
+                    <label className="block text-[#9370db] mb-2 text-sm font-medium tracking-vn-tight flex items-center">
+                      <span className="mr-2 text-[#9370db]">📝</span>
+                      Giới thiệu về bản thân
+                    </label>
+                    {isEditing ? (
+                      <textarea
+                        value={userProfile.bio}
+                        onChange={(e) => handleProfileChange("bio", e.target.value)}
+                        rows={4}
+                        className="w-full px-4 py-2 bg-white/10 backdrop-blur-sm border border-purple-900/30 rounded-lg text-white focus:outline-none focus:border-[#9370db] transition-colors tracking-vn-tight"
+                      ></textarea>
+                    ) : (
+                      <div className="px-4 py-3 bg-white/5 backdrop-blur-sm border border-purple-900/20 rounded-lg text-white tracking-vn-tight min-h-20">
+                        {userProfile.bio || 'Chưa cập nhật'}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
-            
-            {/* Right Column - Stats & Achievements */}
-            <div className="w-full md:w-1/3 space-y-8">
-              {/* Stats */}
-              <div className="bg-white/5 backdrop-blur-sm border border-purple-900/20 p-6 rounded-xl">
-                <h3 className="text-xl font-bold text-white tracking-vn-tight mb-4">Thống kê</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
-                    <p className="text-gray-300 tracking-vn-tight">Số lần xem bói</p>
-                    <p className="text-white font-medium tracking-vn-tight">25</p>
-                  </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
-                    <p className="text-gray-300 tracking-vn-tight">Loại bói phổ biến</p>
-                    <p className="text-white font-medium tracking-vn-tight">Tình yêu</p>
-                  </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
-                    <p className="text-gray-300 tracking-vn-tight">Bài viết trên diễn đàn</p>
-                    <p className="text-white font-medium tracking-vn-tight">5</p>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-300 tracking-vn-tight">Thành viên từ</p>
-                    <p className="text-white font-medium tracking-vn-tight">28/03/2023</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Membership */}
-              <div className="bg-gradient-to-r from-[#2a1045] to-[#3a1c5a] p-6 rounded-xl relative overflow-hidden">
-                <div className="absolute right-0 top-0 w-32 h-32 bg-[#9370db]/20 rounded-full filter blur-[30px]"></div>
-                <div className="absolute left-0 bottom-0 w-24 h-24 bg-[#8a2be2]/20 rounded-full filter blur-[20px]"></div>
                 
-                <div className="relative z-10">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-white tracking-vn-tight">Hạng thành viên</h3>
-                    <div className="px-2 py-1 rounded-full bg-[#9370db]/20">
-                      <span className="text-xs text-[#9370db] tracking-vn-tight font-medium">Cơ bản</span>
+                {/* Account Security Section */}
+                <div className="bg-white/5 backdrop-blur-sm border border-purple-900/20 p-6 rounded-xl">
+                  <h3 className="text-xl font-bold text-white tracking-vn-tight mb-4">Bảo mật tài khoản</h3>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
+                      <div>
+                        <p className="text-white tracking-vn-tight">Đổi mật khẩu</p>
+                        <p className="text-sm text-gray-400 tracking-vn-tight">Cập nhật mật khẩu để bảo vệ tài khoản</p>
+                      </div>
+                      <button className="bg-white/10 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-white/20 transition-colors tracking-vn-tight text-sm">
+                        Đổi mật khẩu
+                      </button>
                     </div>
+                  </div>
+                </div>
+                
+                {/* Recent Readings Section */}
+                <div className="bg-white/5 backdrop-blur-sm border border-purple-900/20 p-6 rounded-xl">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-white tracking-vn-tight">Lịch sử xem gần đây</h3>
+                    <Link to="/reading-history" className="text-[#9370db] hover:text-white transition-colors text-sm tracking-vn-tight">
+                      Xem tất cả
+                    </Link>
                   </div>
                   
                   <div className="space-y-4">
-                    <div className="flex items-center space-x-2 text-gray-300 text-sm tracking-vn-tight">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#9370db]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>3 lần xem bói mỗi ngày</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-300 text-sm tracking-vn-tight">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#9370db]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Truy cập thư viện bài Tarot cơ bản</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-300 text-sm tracking-vn-tight">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#9370db]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Tham gia diễn đàn cộng đồng</span>
-                    </div>
+                    {recentReadings.map(reading => (
+                      <TarotSessionItem 
+                        key={reading.id}
+                        date={reading.date}
+                        reading={reading.reading}
+                        image={reading.image}
+                        result={reading.result}
+                      />
+                    ))}
                   </div>
-                  
-                  <button className="mt-6 w-full bg-gradient-to-r from-[#9370db] to-[#8a2be2] text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-shadow tracking-vn-tight text-center">
-                    Nâng cấp lên Premium
-                  </button>
                 </div>
               </div>
               
-              {/* Achievements */}
-              <div>
-                <h3 className="text-xl font-bold text-white tracking-vn-tight mb-4">Thành tựu</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {badges.map((badge, index) => (
-                    <BadgeItem 
-                      key={index}
-                      title={badge.title}
-                      description={badge.description}
-                      icon={badge.icon}
-                      level={badge.level}
-                      progress={badge.progress}
-                    />
-                  ))}
+              {/* Right Column - Stats & Achievements */}
+              <div className="w-full md:w-1/3 space-y-8">
+                {/* Stats */}
+                <div className="bg-white/5 backdrop-blur-sm border border-purple-900/20 p-6 rounded-xl">
+                  <h3 className="text-xl font-bold text-white tracking-vn-tight mb-4">Thống kê</h3>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
+                      <p className="text-gray-300 tracking-vn-tight">Số lần xem bói</p>
+                      <p className="text-white font-medium tracking-vn-tight">25</p>
+                    </div>
+                    <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
+                      <p className="text-gray-300 tracking-vn-tight">Loại bói phổ biến</p>
+                      <p className="text-white font-medium tracking-vn-tight">Tình yêu</p>
+                    </div>
+                    <div className="flex justify-between items-center pb-4 border-b border-purple-900/20">
+                      <p className="text-gray-300 tracking-vn-tight">Bài viết trên diễn đàn</p>
+                      <p className="text-white font-medium tracking-vn-tight">5</p>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <p className="text-gray-300 tracking-vn-tight">Thành viên từ</p>
+                      <p className="text-white font-medium tracking-vn-tight">28/03/2023</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Membership */}
+                <div className="bg-gradient-to-r from-[#2a1045] to-[#3a1c5a] p-6 rounded-xl relative overflow-hidden">
+                  <div className="absolute right-0 top-0 w-32 h-32 bg-[#9370db]/20 rounded-full filter blur-[30px]"></div>
+                  <div className="absolute left-0 bottom-0 w-24 h-24 bg-[#8a2be2]/20 rounded-full filter blur-[20px]"></div>
+                  
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-white tracking-vn-tight">Hạng thành viên</h3>
+                      <div className="px-2 py-1 rounded-full bg-[#9370db]/20">
+                        <span className="text-xs text-[#9370db] tracking-vn-tight font-medium">Premium</span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2 text-gray-300 text-sm tracking-vn-tight">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#9370db]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Không giới hạn bói bài bằng AI</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-gray-300 text-sm tracking-vn-tight">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#9370db]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Bói 1 lá thông điệp hàng ngày</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-gray-300 text-sm tracking-vn-tight">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#9370db]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Tạo và lưu nhật ký hàng ngày</span>
+                      </div>
+                    </div>
+                    
+                    <button className="mt-6 w-full bg-gradient-to-r from-[#9370db] to-[#8a2be2] text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-shadow tracking-vn-tight text-center">
+                      Nâng cấp lên Premium
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Achievements */}
+                <div>
+                  <h3 className="text-xl font-bold text-white tracking-vn-tight mb-4">Thành tựu</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {badges.map((badge, index) => (
+                      <BadgeItem 
+                        key={index}
+                        title={badge.title}
+                        description={badge.description}
+                        icon={badge.icon}
+                        level={badge.level}
+                        progress={badge.progress}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
       

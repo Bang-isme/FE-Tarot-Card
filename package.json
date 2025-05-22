@@ -9,8 +9,14 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
+    "@cloudinary/react": "^1.14.1",
+    "@cloudinary/url-gen": "^1.21.0",
+    "@google/generative-ai": "^0.24.1",
+    "@greatsumini/react-facebook-login": "^3.4.0",
+    "@react-oauth/google": "^0.12.2",
     "@reduxjs/toolkit": "^2.6.1",
     "axios": "^1.8.3",
+    "date-fns": "^4.1.0",
     "file-loader": "^6.2.0",
     "framer-motion": "^12.6.0",
     "lucide-react": "^0.483.0",

@@ -1,120 +1,147 @@
-import { useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import {
+import { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { 
   fetchAllCards,
-  fetchCardById,
-  fetchDailyTarot,
-  performReading,
+  fetchSpreads,
+  fetchTopics,
+  createReading,
+  fetchUserReadings, 
   fetchReadingById,
-  fetchUserReadings,
-  getInterpretation,
-  selectCard,
-  unselectCard,
-  clearSelectedCards,
-  setCurrentCard,
-  clearError
-} from '../slices/tarotSlice';
+  toggleFavorite,
+  saveInterpretation,
+  setActiveStep,
+  selectSpread,
+  selectTopic,
+  setQuestion,
+  resetReadingForm,
+  clearCurrentReading,
+  selectCards,
+  selectCardsLoading,
+  selectSpreads,
+  selectSpreadsLoading,
+  selectTopics,
+  selectTopicsLoading,
+  selectReadings,
+  selectReadingsLoading,
+  selectCurrentReading,
+  selectPagination,
+  selectActiveStep,
+  selectSelectedSpread,
+  selectSelectedTopic,
+  selectQuestion,
+  selectIsCreatingReading
+} from '../stores/tarot.slice'
 
-export const useTarot = () => {
-  const dispatch = useDispatch();
-  const {
-    cards,
-    selectedCards,
-    currentCard,
-    dailyCard,
-    readings,
-    currentReading,
-    interpretation,
-    loading,
-    error,
-    userReadings
-  } = useSelector((state) => state.tarot);
+const useTarot = () => {
+  const dispatch = useDispatch()
 
-  // Load all cards
-  const loadAllCards = useCallback(() => {
-    return dispatch(fetchAllCards());
-  }, [dispatch]);
+  // Selectors
+  const cards = useSelector(selectCards)
+  const cardsLoading = useSelector(selectCardsLoading)
+  const spreads = useSelector(selectSpreads)
+  const spreadsLoading = useSelector(selectSpreadsLoading)
+  const topics = useSelector(selectTopics)
+  const topicsLoading = useSelector(selectTopicsLoading)
+  const readings = useSelector(selectReadings)
+  const readingsLoading = useSelector(selectReadingsLoading)
+  const currentReading = useSelector(selectCurrentReading)
+  const pagination = useSelector(selectPagination)
+  const activeStep = useSelector(selectActiveStep)
+  const selectedSpread = useSelector(selectSelectedSpread)
+  const selectedTopic = useSelector(selectSelectedTopic)
+  const question = useSelector(selectQuestion)
+  const isCreatingReading = useSelector(selectIsCreatingReading)
 
-  // Load a specific card
-  const loadCardById = useCallback((cardId) => {
-    return dispatch(fetchCardById(cardId));
-  }, [dispatch]);
+  // Load initial data
+  useEffect(() => {
+    if (cards.length === 0) {
+      dispatch(fetchAllCards())
+    }
+    if (spreads.length === 0) {
+      dispatch(fetchSpreads())
+    }
+    if (topics.length === 0) {
+      dispatch(fetchTopics())
+    }
+  }, [dispatch, cards.length, spreads.length, topics.length])
 
-  // Load daily tarot
-  const loadDailyTarot = useCallback(() => {
-    return dispatch(fetchDailyTarot());
-  }, [dispatch]);
+  // Actions
+  const loadUserReadings = (params = {}) => {
+    const { page = 1, limit = 10, filter } = params
+    dispatch(fetchUserReadings({ page, limit, filter }))
+  }
 
-  // Create a new reading
-  const createNewReading = useCallback((readingData) => {
-    return dispatch(performReading(readingData));
-  }, [dispatch]);
+  const loadReadingById = (readingId) => {
+    dispatch(fetchReadingById(readingId))
+  }
 
-  // Load a specific reading
-  const loadReadingById = useCallback((readingId) => {
-    return dispatch(fetchReadingById(readingId));
-  }, [dispatch]);
+  const handleCreateReading = (readingData) => {
+    return dispatch(createReading(readingData)).unwrap()
+  }
 
-  // Load user's reading history
-  const loadUserReadings = useCallback((params = {}) => {
-    return dispatch(fetchUserReadings(params));
-  }, [dispatch]);
+  const handleSetActiveStep = (step) => {
+    dispatch(setActiveStep(step))
+  }
 
-  // Get AI interpretation for cards
-  const getAIInterpretation = useCallback((cards, question, readingType) => {
-    return dispatch(getInterpretation({ cards, question, readingType }));
-  }, [dispatch]);
+  const handleSelectSpread = (spread) => {
+    dispatch(selectSpread(spread))
+  }
 
-  // Select a card
-  const handleSelectCard = useCallback((card) => {
-    dispatch(selectCard(card));
-  }, [dispatch]);
+  const handleSelectTopic = (topic) => {
+    dispatch(selectTopic(topic))
+  }
 
-  // Unselect a card
-  const handleUnselectCard = useCallback((card) => {
-    dispatch(unselectCard(card));
-  }, [dispatch]);
+  const handleSetQuestion = (questionText) => {
+    dispatch(setQuestion(questionText))
+  }
 
-  // Clear selected cards
-  const handleClearSelectedCards = useCallback(() => {
-    dispatch(clearSelectedCards());
-  }, [dispatch]);
+  const handleResetForm = () => {
+    dispatch(resetReadingForm())
+  }
 
-  // Set current card
-  const handleSetCurrentCard = useCallback((card) => {
-    dispatch(setCurrentCard(card));
-  }, [dispatch]);
+  const handleClearCurrentReading = () => {
+    dispatch(clearCurrentReading())
+  }
 
-  // Clear error
-  const handleClearError = useCallback(() => {
-    dispatch(clearError());
-  }, [dispatch]);
+  const handleToggleFavorite = (readingId, isFavorite) => {
+    dispatch(toggleFavorite({ readingId, isFavorite }))
+  }
+
+  const handleSaveInterpretation = (readingId, interpretationData) => {
+    dispatch(saveInterpretation({ readingId, interpretationData }))
+  }
 
   return {
     // State
     cards,
-    selectedCards,
-    currentCard,
-    dailyCard,
+    cardsLoading,
+    spreads,
+    spreadsLoading,
+    topics,
+    topicsLoading,
     readings,
+    readingsLoading,
     currentReading,
-    interpretation,
-    loading,
-    error,
-    userReadings,
-    
+    pagination,
+    activeStep,
+    selectedSpread,
+    selectedTopic,
+    question,
+    isCreatingReading,
+
     // Actions
-    loadAllCards,
-    loadCardById,
-    loadDailyTarot,
-    createNewReading,
-    loadReadingById,
     loadUserReadings,
-    getAIInterpretation,
-    handleSelectCard,
-    handleUnselectCard,
-    handleClearSelectedCards,
-    handleSetCurrentCard,
-    handleClearError
-  };
-}; 
+    loadReadingById,
+    handleCreateReading,
+    handleSetActiveStep,
+    handleSelectSpread,
+    handleSelectTopic,
+    handleSetQuestion,
+    handleResetForm,
+    handleClearCurrentReading,
+    handleToggleFavorite,
+    handleSaveInterpretation
+  }
+}
+
+export default useTarot 

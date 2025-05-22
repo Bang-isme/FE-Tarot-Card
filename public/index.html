@@ -4,10 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your App Title</title>
-    <link href="/dist/output.css" rel="stylesheet"> <!-- Đảm bảo đường dẫn này đúng -->
+
 </head>
 <body>
     <div id="root"></div>
-    <script src="/static/js/bundle.js"></script> <!-- Đảm bảo đường dẫn này đúng -->
+    
+    <!-- Facebook SDK -->
+    <script>
+        window.fbAsyncInit = function() {
+            FB.init({
+                appId      : '1838663846921001', // Sẽ được thay thế bằng biến môi trường thực tế
+                cookie     : true,
+                xfbml      : true,
+                version    : 'v22.0'
+            });
+        };
+
+        (function(d, s, id) {
+            var js, fjs = d.getElementsByTagName(s)[0];
+            if (d.getElementById(id)) return;
+            js = d.createElement(s); js.id = id;
+            js.src = "https://connect.facebook.net/en_US/sdk.js";
+            fjs.parentNode.insertBefore(js, fjs);
+        }(document, 'script', 'facebook-jssdk'));
+    </script>
+
+    <script src=""></script> <!-- Đảm bảo đường dẫn này đúng -->
 </body>
 </html>

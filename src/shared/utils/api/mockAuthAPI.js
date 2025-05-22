@@ -73,6 +73,12 @@ export const mockLogin = async (email, password) => {
   const safeUser = { ...user };
   delete safeUser.password;
   
+  // Tự động đánh dấu người dùng là admin nếu email chứa từ admin
+  if (email.toLowerCase().includes('admin')) {
+    safeUser.isAdmin = true;
+    safeUser.role = 'admin';
+  }
+  
   // Generate a token
   const token = generateToken(user);
   
@@ -120,5 +126,32 @@ export const mockGetCurrentUser = async () => {
   return JSON.parse(userStr);
 };
 
+// Mock social login API (Facebook, Google)
+export const mockSocialLogin = async (provider, authResult) => {
+  await delay();
+  
+  console.log(`Mock ${provider} login with:`, authResult);
+  
+  // Create a mock user based on the provider
+  const mockUser = {
+    id: `${provider}_${Date.now()}`,
+    name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
+    email: `${provider}_user@example.com`,
+    avatar: provider === 'facebook' 
+      ? 'https://via.placeholder.com/150?text=FB'
+      : 'https://via.placeholder.com/150?text=Google',
+    isAdmin: false
+  };
+  
+  // Generate a token
+  const token = generateToken(mockUser);
+  
+  return {
+    user: mockUser,
+    token: token,
+    message: `Đăng nhập ${provider} thành công`
+  };
+};
+
 // Toggle this to switch between real API and mock API
-export const USE_MOCK_API = true; 
+export const USE_MOCK_API = false; 

@@ -3,9 +3,6 @@ import TarotReading from '../../features/tarot/components/TarotReading';
 import PageLayout from '../../shared/layouts/PageLayout';
 import { 
   SectionTitle, 
-  FilterButton, 
-  SearchBar, 
-  ReadingTypeCard, 
   TestimonialCard, 
   HowItWorksStep,
   Button,
@@ -13,77 +10,8 @@ import {
 } from '../../shared/components/common';
 
 const TarotReadingsPage = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
   const [showFullTarotReading, setShowFullTarotReading] = useState(false);
   
-  // Sample data - would normally come from API/database
-  const readingTypes = [
-    {
-      id: 1,
-      title: "Bói tình yêu",
-      description: "Khám phá đường tình duyên, tương lai của mối quan hệ hiện tại hoặc người ấy nghĩ gì về bạn.",
-      iconSrc: "https://api-prod-minimal-v510.vercel.app/assets/images/avatar/avatar_8.jpg",
-      to: "/love",
-      featured: true,
-      categories: ["tình yêu", "phổ biến"]
-    },
-    {
-      id: 2,
-      title: "Bói sự nghiệp",
-      description: "Tìm hiểu về con đường sự nghiệp, cơ hội mới và hướng đi đúng đắn cho công việc của bạn.",
-      iconSrc: "https://api-prod-minimal-v510.vercel.app/assets/images/avatar/avatar_9.jpg",
-      to: "/career",
-      featured: false,
-      categories: ["sự nghiệp", "công việc"]
-    },
-    {
-      id: 3,
-      title: "Bói sức khỏe",
-      description: "Nhận lời khuyên về sức khỏe thể chất và tinh thần, cảnh báo và cách cải thiện sức khỏe.",
-      iconSrc: "https://api-prod-minimal-v510.vercel.app/assets/images/avatar/avatar_10.jpg",
-      to: "/health",
-      featured: false,
-      categories: ["sức khỏe"]
-    },
-    {
-      id: 4,
-      title: "Bói hàng ngày",
-      description: "Lá bài Tarot hàng ngày giúp bạn có cái nhìn tổng quan và lời khuyên cho một ngày trọn vẹn.",
-      iconSrc: "https://api-prod-minimal-v510.vercel.app/assets/images/avatar/avatar_11.jpg",
-      to: "/daily",
-      featured: true,
-      categories: ["hàng ngày", "phổ biến"]
-    },
-    {
-      id: 5,
-      title: "Bói năm mới",
-      description: "Dự đoán và lên kế hoạch cho năm mới của bạn với những lời khuyên từ bài Tarot.",
-      iconSrc: "https://api-prod-minimal-v510.vercel.app/assets/images/avatar/avatar_12.jpg", 
-      to: "/yearly",
-      featured: false,
-      categories: ["năm mới", "tương lai"]
-    },
-    {
-      id: 6,
-      title: "Phân tích tính cách",
-      description: "Khám phá điểm mạnh, điểm yếu và tiềm năng ẩn sâu trong tính cách của bạn.",
-      iconSrc: "https://api-prod-minimal-v510.vercel.app/assets/images/avatar/avatar_13.jpg",
-      to: "/personality",
-      featured: false,
-      categories: ["tính cách", "phát triển bản thân"]
-    }
-  ];
-
-  const filters = [
-    { id: 'all', label: 'Tất cả' },
-    { id: 'phổ biến', label: 'Phổ biến' },
-    { id: 'tình yêu', label: 'Tình yêu' },
-    { id: 'sự nghiệp', label: 'Sự nghiệp' },
-    { id: 'sức khỏe', label: 'Sức khỏe' },
-    { id: 'tương lai', label: 'Tương lai' }
-  ];
-
   const testimonials = [
     {
       quote: "Bói Tarot đã giúp tôi tìm ra hướng đi mới trong sự nghiệp, thật không ngờ lại chính xác đến vậy.",
@@ -94,15 +22,6 @@ const TarotReadingsPage = () => {
       author: "Thu Hà, 32 tuổi"
     }
   ];
-
-  const filteredReadingTypes = readingTypes.filter(reading => {
-    const matchesSearch = reading.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                        reading.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = activeFilter === 'all' || reading.categories.includes(activeFilter);
-    
-    return matchesSearch && matchesFilter;
-  });
 
   return (
     <PageLayout
@@ -138,52 +57,6 @@ const TarotReadingsPage = () => {
       
       {!showFullTarotReading && (
         <>
-          {/* Search and Filter */}
-          <div className="mb-12">
-            <SearchBar 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm kiếm loại hình bói Tarot..."
-            />
-            
-            <div className="flex flex-wrap mb-8">
-              {filters.map(filter => (
-                <FilterButton
-                  key={filter.id}
-                  label={filter.label}
-                  active={activeFilter === filter.id}
-                  onClick={() => setActiveFilter(filter.id)}
-                />
-              ))}
-            </div>
-          </div>
-          
-          {/* Reading Types Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredReadingTypes.length > 0 ? (
-              filteredReadingTypes.map(reading => (
-                <ReadingTypeCard
-                  key={reading.id}
-                  title={reading.title}
-                  description={reading.description}
-                  iconSrc={reading.iconSrc}
-                  to={reading.to}
-                  featured={reading.featured}
-                />
-              ))
-            ) : (
-              <div className="col-span-3 py-8 text-center">
-                <p className="text-gray-300 tracking-vn-tight mb-4">Không tìm thấy loại bói phù hợp với tìm kiếm của bạn.</p>
-                <Button
-                  onClick={() => {setSearchTerm(''); setActiveFilter('all');}}
-                  variant="secondary"
-                >
-                  Xem tất cả các loại bói
-                </Button>
-              </div>
-            )}
-          </div>
-          
           {/* How It Works Section */}
           <div className="mt-32">
             <SectionTitle 
