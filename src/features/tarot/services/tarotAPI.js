@@ -14,35 +14,6 @@ const TAROT_CARDS = tarotCardsData.map(card => ({
   keywords: card.keywords || []
 }));
 
-// DEBUG: Kiểm tra TAROT_CARDS sau khi khởi tạo, bao gồm cả imageUrl
-console.log(
-  'TAROT_CARDS initialized (first 5 with imageUrl):', 
-  TAROT_CARDS.slice(0, 5).map(c => ({ 
-    id: c.id, 
-    name: c.name, 
-    imageUrl: c.imageUrl 
-  }))
-);
-// Kiểm tra ý nghĩa ngược của 2 lá bài đầu tiên
-if (TAROT_CARDS.length >= 2) {
-  console.log('Sample upright meaning:', TAROT_CARDS[0].meaning);
-  console.log('Sample reversed meaning:', TAROT_CARDS[0].reversed_meaning);
-  console.log('Sample upright meaning:', TAROT_CARDS[1].meaning);
-  console.log('Sample reversed meaning:', TAROT_CARDS[1].reversed_meaning);
-}
-console.log('Number of cards in TAROT_CARDS:', TAROT_CARDS.length);
-// In ra một vài ví dụ về type của các lá bài
-if (TAROT_CARDS.length > 0) {
-  console.log('Sample card types (first 5):', TAROT_CARDS.slice(0, 5).map(c => ({id: c.id, name: c.name, type: c.type})));
-  // Kiểm tra mẫu từ các lá bài sau vị trí của Major Arcana (ID > 21)
-  const minorSample = TAROT_CARDS.filter(c => c.id > 21).slice(0,5);
-  if (minorSample.length > 0) {
-    console.log('Sample card types (expected Minor Arcana):', minorSample.map(c => ({id: c.id, name: c.name, type: c.type})));
-  } else {
-    console.log('Could not find sample Minor Arcana cards for type check.');
-  }
-}
-
 // Simulated delay for mock responses
 const mockDelay = (ms = 800) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -54,22 +25,16 @@ const mockDelay = (ms = 800) => new Promise(resolve => setTimeout(resolve, ms));
 const getRandomTwelveCards = () => {
   // Kiểm tra xem có đủ thẻ bài để chọn không
   if (!TAROT_CARDS || TAROT_CARDS.length === 0) {
-    console.error('Không có dữ liệu thẻ bài');
-    // Trả về một mảng trống thay vì lỗi để tránh crash app
     return [];
   }
   
   try {
-  // Sao chép và trộn tất cả bài
-  const shuffledCards = [...TAROT_CARDS].sort(() => Math.random() - 0.5);
-  
-  // Lấy 12 lá đầu tiên sau khi trộn
-  const twelveCards = shuffledCards.slice(0, 12);
-  
-    console.log(`Đã lấy thành công ${twelveCards.length} lá bài ngẫu nhiên từ ${TAROT_CARDS.length} lá bài có sẵn`);
-  return twelveCards;
+    // Sao chép và trộn tất cả bài
+    const shuffledCards = [...TAROT_CARDS].sort(() => Math.random() - 0.5);
+    
+    // Lấy 12 lá đầu tiên sau khi trộn
+    return shuffledCards.slice(0, 12);
   } catch (error) {
-    console.error('Lỗi khi lấy 12 lá bài ngẫu nhiên:', error);
     // Fallback: Trả về 12 lá bài đầu tiên nếu có lỗi xảy ra
     return TAROT_CARDS.slice(0, 12);
   }
@@ -84,12 +49,10 @@ const getRandomTwelveCards = () => {
  */
 const prepareSelectedCards = (selectedIndices, displayedCards) => {
   if (!selectedIndices || !Array.isArray(selectedIndices) || selectedIndices.length !== 3) {
-    console.error('Phải chọn đúng 3 lá bài');
     return [];
   }
   
   if (!displayedCards || !Array.isArray(displayedCards) || displayedCards.length < 12) {
-    console.error('Không đủ lá bài để chọn');
     return [];
   }
   
@@ -117,6 +80,7 @@ const prepareSelectedCards = (selectedIndices, displayedCards) => {
 };
 
 // Toggle to use mock data when real API is not available
+// ĐẶT BIẾN NÀY THÀNH FALSE ĐỂ SỬ DỤNG API THỰC TẾ THAY VÌ MOCK DATA
 const USE_MOCK_API = false;
 
 // Lưu cài đặt USE_MOCK_API vào localStorage để các module khác có thể truy cập
@@ -193,26 +157,23 @@ export const getDailyTarot = async () => {
 export const getTwelveRandomCards = async () => {
   try {
     if (USE_MOCK_API) {
-      console.log('Mock API: Đang lấy 12 lá bài ngẫu nhiên...');
       await mockDelay();
       const randomCards = getRandomTwelveCards();
       
       if (randomCards.length === 0) {
-        console.error('Không lấy được lá bài nào, sử dụng dữ liệu fallback');
         // Fallback: sử dụng các lá bài cứng nếu không lấy được ngẫu nhiên
         return Promise.resolve(TAROT_CARDS.slice(0, 12));
       }
       
-      console.log(`Đã lấy được ${randomCards.length} lá bài ngẫu nhiên thành công`);
       return Promise.resolve(randomCards);
     }
     
-    const response = await apiClient.get('/tarot/random-twelve');
+    const response = await apiClient.get('/cards/random', {
+      params: { limit: 12 }
+    });
     return response.data;
   } catch (error) {
-    console.error('Lỗi khi lấy 12 lá bài ngẫu nhiên:', error);
     if (USE_MOCK_API) {
-      console.log('Sử dụng dữ liệu fallback do lỗi xảy ra');
       // Fallback khi có lỗi: luôn trả về dữ liệu thay vì throw error
       return Promise.resolve(TAROT_CARDS.slice(0, 12));
     }
@@ -243,12 +204,13 @@ export const createStandardReading = async (selectedIndices, displayedCards, dom
       };
     }
     
-    const response = await apiClient.post('/tarot/readings/standard', {
+    const response = await apiClient.post('/tarot/readings', {
       selectedIndices,
       displayedCards,
       domain,
       question
     });
+
     return response.data;
   } catch (error) {
     if (USE_MOCK_API) {
@@ -403,7 +365,7 @@ export const createAIReading = async (selectedIndices, displayedCards, domain = 
       };
     }
     
-    const response = await apiClient.post('/tarot/readings/ai', {
+    const response = await apiClient.post('/readings/ai', {
       selectedIndices,
       displayedCards,
       domain,
@@ -524,7 +486,7 @@ export const saveReading = async (reading) => {
       };
     }
     
-    const response = await apiClient.post('/tarot/readings/save', reading);
+    const response = await apiClient.post('/readings/save', reading);
     return response.data;
   } catch (error) {
     if (USE_MOCK_API) {
@@ -551,7 +513,7 @@ export const deleteReading = async (readingId) => {
       };
     }
     
-    const response = await apiClient.delete(`/tarot/readings/${readingId}`);
+    const response = await apiClient.delete(`/readings/${readingId}`);
     return response.data;
   } catch (error) {
     if (USE_MOCK_API) {
@@ -576,7 +538,7 @@ export const createShareLink = async (readingId) => {
       };
     }
     
-    const response = await apiClient.get(`/tarot/readings/${readingId}/share-link`);
+    const response = await apiClient.get(`/readings/${readingId}/share-link`);
     return response.data;
   } catch (error) {
     if (USE_MOCK_API) {
@@ -614,7 +576,7 @@ export const getSharedReading = async (shareToken) => {
       };
     }
     
-    const response = await apiClient.get(`/tarot/shared/${shareToken}`);
+    const response = await apiClient.get(`/readings/shared/${shareToken}`);
     return response.data;
   } catch (error) {
     if (USE_MOCK_API) {

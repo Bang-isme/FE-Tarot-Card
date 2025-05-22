@@ -3,18 +3,14 @@
  */
 
 // API URL dựa vào môi trường
-let baseApiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+let baseApiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 // Thêm kiểm tra để đảm bảo API_URL không có '/api' ở cuối
 if (baseApiUrl.endsWith('/api')) {
-  console.warn('API_URL không nên kết thúc bằng /api, sẽ tự động loại bỏ');
   baseApiUrl = baseApiUrl.substring(0, baseApiUrl.length - 4);
 }
 
-export const API_URL = baseApiUrl;
-
-// Log API URL để debug
-console.log('API_URL được cấu hình trong constants.js:', API_URL);
+export const API_URL = `${baseApiUrl}/api`;
 
 // Cloudinary configuration
 export const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dfp2ne3nn';
@@ -42,8 +38,7 @@ export const TAROT_TOPICS = {
 // Tarot spreads
 export const TAROT_SPREADS = {
   THREE_CARD: { id: 1, name: 'Ba Lá', positions: ['Bản thân', 'Hoàn cảnh', 'Lời khuyên'] },
-  CELTIC_CROSS: { id: 2, name: 'Thánh Giá Celtic' },
-  SINGLE_CARD: { id: 3, name: 'Một Lá', positions: ['Thông Điệp'] }
+  SINGLE_CARD: { id: 2, name: 'Một Lá', positions: ['Thông Điệp'] }
 };
 
 // Local storage keys

@@ -39,49 +39,53 @@ const TarotReading = memo(() => {
 
   // Fetch tất cả cards khi component mount
   useEffect(() => {
-    // Debug API URL
-    console.log('API_URL từ constants:', API_URL);
+    // Log the API URL to verify configuration
+    console.log('API URL being used:', API_URL);
     
-    // Tự động chuyển sang mock nếu không thể kết nối đến server
-    const checkServerAndFallbackToMock = async () => {
-      try {
-        console.log('Kiểm tra kết nối tới server API...');
-        // Sử dụng apiClient
-        console.log('Kiểm tra kết nối tới server API qua apiClient');
-        await apiClient.get('/health', { 
-          timeout: 5000,
-          headers: { "Cache-Control": "no-cache" } 
-        }).catch(e => {
-          throw new Error("Can't connect to API server");
+    // Fetch cards if none are loaded
+    if (cards.length === 0 && !loading) {
+      // First, let's test the server connection with a simple fetch
+      fetch(`${API_URL}/cards`)
+        .then(response => {
+          console.log('Server connection test:', response.status, response.ok);
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('Server test data received, count:', data.data?.cards?.length || 0);
+        })
+        .catch(error => {
+          console.error('Server connection test failed:', error.message);
         });
-        console.log('Kết nối tới server API thành công!');
-        // Nếu kết nối thành công, đảm bảo USE_MOCK_API là false
-        localStorage.setItem('USE_MOCK_API', 'false');
-        
-        // Fetch cards chỉ sau khi kiểm tra kết nối thành công
-        if (cards.length === 0 && !loading) {
-          console.log('Gọi fetchAllCards trong TarotReading.js sau khi kiểm tra kết nối thành công');
-      dispatch(fetchAllCards());
-        }
-      } catch (error) {
-        console.error('Không thể kết nối tới server API:', error);
-        console.log('Chuyển sang sử dụng mock data...');
-        localStorage.setItem('USE_MOCK_API', 'true');
-        dispatch(clearError());
-        
-        // Fetch cards với mock data sau khi chuyển sang chế độ mock
-        if (cards.length === 0 && !loading) {
-          console.log('Gọi fetchAllCards trong TarotReading.js với mock data');
-          dispatch(fetchAllCards());
-        }
-      }
-    };
-    
-    checkServerAndFallbackToMock();
+      
+      // Now proceed with the normal Redux flow
+      dispatch(fetchAllCards())
+        .unwrap()
+        .then(data => {
+          if (data && Array.isArray(data)) {
+            console.log('Tải lá bài thành công:', data.length, 'lá');
+          } else if (data && data.data && Array.isArray(data.data.cards)) {
+            console.log('Tải lá bài thành công:', data.data.cards.length, 'lá');
+          } else {
+            console.log('Tải lá bài thành công, nhưng cấu trúc dữ liệu không như mong đợi');
+          }
+        })
+        .catch(error => {
+          console.error('Lỗi khi tải lá bài:', error);
+          // Nếu không thể kết nối đến API, bật USE_MOCK_API
+          if (error.message && error.message.includes('Không thể kết nối')) {
+            console.log('Không thể kết nối đến API, chuyển sang chế độ mock data');
+            localStorage.setItem('USE_MOCK_API', 'true');
+            // Thử lại với mock data
+            dispatch(fetchAllCards());
+          }
+        });
+    }
     
     // Automatically draw 12 random cards if none are displayed yet
     if (twelveCards.length === 0 && cards.length > 0 && !loading) {
-      console.log('Chuẩn bị 12 lá bài ngẫu nhiên từ', cards.length, 'lá');
       const shuffled = [...cards].sort(() => Math.random() - 0.5);
       dispatch(setTwelveCards(shuffled.slice(0, 12)));
     }
@@ -90,13 +94,7 @@ const TarotReading = memo(() => {
     const introTimer = setTimeout(() => {
       setShowIntro(false);
     }, 3000);
-    
-    // Debug USE_MOCK_API
-    console.log('USE_MOCK_API state:', localStorage.getItem('USE_MOCK_API'));
-    
-    // Debug error value
-    console.log('Trạng thái error:', error);
-    
+        
     return () => {
       clearTimeout(introTimer);
     };
@@ -162,21 +160,31 @@ const TarotReading = memo(() => {
       
       // Lấy 12 lá bài ngẫu nhiên thông qua redux action
       dispatch(fetchTwelveRandomCards())
-        .then(action => {
-        if (action.payload) {
-            console.log('Đã nhận được 12 lá bài ngẫu nhiên thành công:', action.payload.length);
-          // Đặt 12 lá bài vào state nhưng chưa hiển thị
-          setTableCards(action.payload);
+        .unwrap()
+        .then(cards => {
+          console.log('Lấy lá bài thành công:', cards);
           
-          // Bắt đầu trải bài sau khi bộ bài đã di chuyển vào góc
-          setTimeout(() => {
-            setIsDealingCards(true);
-          }, 1000);
+          // Kiểm tra xem cards có phải là một mảng không
+          if (cards && Array.isArray(cards) && cards.length > 0) {
+            console.log(`Đã nhận được ${cards.length} lá bài, đặt vào tableCards`);
+            setTableCards(cards);
+            
+            // Bắt đầu trải bài sau khi bộ bài đã di chuyển vào góc
+            setTimeout(() => {
+              setIsDealingCards(true);
+            }, 1000);
+          } else if (cards && typeof cards === 'object' && cards.data && Array.isArray(cards.data.cards)) {
+            // Handle alternative response structure
+            console.log(`Đã nhận được ${cards.data.cards.length} lá bài từ cấu trúc khác`);
+            setTableCards(cards.data.cards);
+            
+            setTimeout(() => {
+              setIsDealingCards(true);
+            }, 1000);
           } else {
-            console.error('Không nhận được lá bài nào từ action.payload');
+            console.error('Dữ liệu lá bài không hợp lệ:', cards);
             // Fallback: Sử dụng lá bài từ cards nếu có
             if (cards && cards.length > 0) {
-              console.log('Sử dụng fallback: lấy 12 lá bài từ cards hiện có');
               const shuffled = [...cards].sort(() => Math.random() - 0.5);
               const twelveRandomCards = shuffled.slice(0, 12);
               setTableCards(twelveRandomCards);
@@ -185,16 +193,16 @@ const TarotReading = memo(() => {
                 setIsDealingCards(true);
               }, 1000);
             } else {
-              // Hiển thị lỗi hoặc thông báo
-              console.error('Không có lá bài nào có sẵn để fallback');
+              alert('Không thể lấy được lá bài. Vui lòng thử lại!');
             }
           }
         })
         .catch(error => {
-          console.error('Lỗi khi lấy 12 lá bài ngẫu nhiên:', error);
-          // Fallback: Sử dụng lá bài từ cards nếu có
+          console.error('Lỗi khi lấy lá bài ngẫu nhiên:', error);
+          
+          // Fallback: Sử dụng lá bài từ redux state nếu có
           if (cards && cards.length > 0) {
-            console.log('Sử dụng fallback: lấy 12 lá bài từ cards hiện có sau khi gặp lỗi');
+            console.log('Sử dụng fallback khi có lỗi - lấy từ cards có sẵn');
             const shuffled = [...cards].sort(() => Math.random() - 0.5);
             const twelveRandomCards = shuffled.slice(0, 12);
             setTableCards(twelveRandomCards);
@@ -203,10 +211,9 @@ const TarotReading = memo(() => {
               setIsDealingCards(true);
             }, 1000);
           } else {
-            // Hiển thị lỗi hoặc thông báo
-            console.error('Không có lá bài nào có sẵn để fallback sau lỗi');
-        }
-      });
+            alert('Không thể lấy được lá bài. Vui lòng thử lại!');
+          }
+        });
     }, 2500);
   }, [dispatch, cards]);
   
@@ -230,8 +237,6 @@ const TarotReading = memo(() => {
   // Xử lý khi bấm nút "Xem kết quả"
   const handleProceedToResult = useCallback(() => {
     if (userSelectedCards.length === 3 && selectedIndices.length === 3) {
-      console.log('TarotReading.js - Proceeding to result with selected indices:', selectedIndices);
-      
       // Tạo đối tượng data để gửi đi
       const data = {
         selectedIndices: selectedIndices,
@@ -240,12 +245,7 @@ const TarotReading = memo(() => {
         question: useAI ? aiQuestion : '',
         useAI: useAI
       };
-      
-      // Kiểm tra USE_MOCK_API để log
-      const useMockApi = localStorage.getItem('USE_MOCK_API') === 'true' || 
-                        process.env.REACT_APP_USE_MOCK_API === 'true';
-      console.log('Chế độ USE_MOCK_API khi xem kết quả:', useMockApi);
-      
+            
       // Clear error trước khi gọi API mới
       dispatch(clearError());
       
@@ -254,32 +254,26 @@ const TarotReading = memo(() => {
         dispatch(performAIReading(data))
           .then(result => {
             // Nếu thành công, chuyển đến màn hình kết quả
-            console.log('AI Reading result:', result);
             if (!result.error) {
               setReadingStep('result');
       } else {
-              console.error('Error in AI reading:', result.error);
               // Không chuyển đến kết quả nếu có lỗi
             }
           })
           .catch(err => {
-            console.error('Error processing AI reading:', err);
             // Xử lý lỗi nếu cần
           });
       } else {
         dispatch(performStandardReading(data))
           .then(result => {
             // Nếu thành công, chuyển đến màn hình kết quả
-            console.log('Standard Reading result:', result);
             if (!result.error) {
       setReadingStep('result');
             } else {
-              console.error('Error in standard reading:', result.error);
               // Không chuyển đến kết quả nếu có lỗi
             }
           })
           .catch(err => {
-            console.error('Error processing standard reading:', err);
             // Xử lý lỗi nếu cần
           });
       }
@@ -470,7 +464,6 @@ const TarotReading = memo(() => {
 
   // Xử lý khi bắt đầu trải bài
   const handleStartReading = useCallback((readingData) => {
-    console.log('TarotReading.js - handleStartReading với readingData:', readingData);
     setReadingStarted(true);
     setReadingData(readingData);
     setSelectedReadingType(readingData.readingType);
@@ -478,10 +471,8 @@ const TarotReading = memo(() => {
     
     // Nếu là bói AI, chuyển đến bước nhập câu hỏi trước, ngược lại bắt đầu xáo bài ngay
     if (readingData.useAI) {
-      console.log('TarotReading.js - Chuyển đến bước nhập câu hỏi AI');
       setReadingStep('ai-question');
     } else {
-      console.log('TarotReading.js - Bắt đầu xáo bài ngay (bói thường)');
       setReadingStep('shuffling');
       handleShuffleCards();
     }
@@ -489,7 +480,6 @@ const TarotReading = memo(() => {
 
   // Xử lý khi xác nhận câu hỏi AI
   const handleAIQuestionSubmit = useCallback(() => {
-    console.log('TarotReading.js - handleAIQuestionSubmit được gọi với câu hỏi:', aiQuestion);
     setReadingStep('shuffling');
     // Đảm bảo chúng ta có sự chậm trễ để trạng thái cập nhật trước khi bắt đầu shuffle
     setTimeout(() => {
@@ -501,11 +491,6 @@ const TarotReading = memo(() => {
   const handleAIQuestionChange = useCallback((question) => {
     setAIQuestion(question);
   }, []);
-
-  // Thêm effect để theo dõi khi readingStep thay đổi
-  useEffect(() => {
-    console.log('TarotReading.js - readingStep thay đổi thành:', readingStep);
-  }, [readingStep]);
 
   // Render trang intro
   if (showIntro) {

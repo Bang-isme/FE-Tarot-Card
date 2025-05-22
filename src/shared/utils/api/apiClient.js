@@ -6,21 +6,23 @@ import { API_URL } from '../../../config/constants';
 
 // Base config for axios
 const apiClient = axios.create({
-  baseURL: `${API_URL}`,
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache'
   },
-  timeout: 30000, // Tăng timeout lên 30 giây để tránh lỗi timeout
+  timeout: 10000, // Reduce the timeout to 10 seconds for faster error detection
+  withCredentials: true, // Enable sending cookies with requests
 });
 
-// Log config để debug
-console.log('apiClient.js - Sử dụng baseURL:', `${API_URL}`);
+// Log the API URL being used to make debugging easier
+console.log('apiClient initialized with baseURL:', API_URL);
 
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    // Lấy token auth từ localStorage
+    const token = localStorage.getItem('token') || localStorage.getItem('tarotOnlineAuthToken');
     
     // Add check for USE_MOCK_API before requiring token
     const useMockApi = localStorage.getItem('USE_MOCK_API') === 'true' || 
@@ -29,10 +31,8 @@ apiClient.interceptors.request.use(
     // Skip token check when using mock API
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('Đã thêm token xác thực vào request');
     } else if (!useMockApi) {
       // Prepare for fallback authentication only when not using mock API
-      console.log('Không tìm thấy token xác thực. Sử dụng chế độ khách.');
     }
     
     return config;
@@ -40,14 +40,46 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(enhanceNetworkError(error))
 );
 
-// Response interceptor
+// Add a retry mechanism for failed requests
+const MAX_RETRIES = 2;
 apiClient.interceptors.response.use(
+  // Handle successful responses
   (response) => {
-    // Log successful responses for debugging
-    console.log(`API Response [${response.config.method.toUpperCase()}] ${response.config.url}:`, response.status);
+    // Only log if in development mode
+    if (process.env.NODE_ENV === 'development') {
+      // Log only basic info about successful responses
+      console.log(`API ${response.config.method.toUpperCase()} ${response.config.url}: ${response.status}`);
+    }
     return response;
   },
-  (error) => {
+  // Handle error responses with retry logic
+  async (error) => {
+    const { config } = error;
+    
+    // Only retry GET requests that failed due to network issues
+    if (config && config.method && config.method.toLowerCase() === 'get' && !error.response) {
+      config.retryCount = config.retryCount || 0;
+      
+      // Check if we've maxed out the retries
+      if (config.retryCount < MAX_RETRIES) {
+        // Increment the retry count
+        config.retryCount += 1;
+        
+        console.log(`Retry attempt ${config.retryCount} for URL: ${config.url}`);
+        
+        // Create new promise to handle retry
+        const backoff = new Promise((resolve) => {
+          setTimeout(() => {
+            console.log('Retrying request...');
+            resolve();
+          }, 1000 * config.retryCount); // Increasing backoff
+        });
+        
+        await backoff;
+        return apiClient(config);
+      }
+    }
+    
     // Enhance error with more details
     const enhancedError = enhanceNetworkError(error);
     
@@ -67,24 +99,24 @@ apiClient.interceptors.response.use(
     
     // Handle network errors
     if (!error.response) {
-      console.error('Network Error:', enhancedError.enhancedData);
+      console.error('Lỗi kết nối mạng:', error.message);
       return Promise.reject({ 
         message: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng của bạn.',
-        originalError: enhancedError.enhancedData 
+        originalError: error.message 
       });
     }
     
     // Handle 500 errors
     if (error.response.status >= 500) {
-      console.error('Server Error:', enhancedError.enhancedData);
+      console.error('Lỗi máy chủ:', error.response.status);
       return Promise.reject({ 
         message: 'Đã xảy ra lỗi máy chủ. Vui lòng thử lại sau.',
-        originalError: enhancedError.enhancedData
+        originalError: error.response.data
       });
     }
     
     // Return the error response data for handling by the components
-    return Promise.reject(enhancedError);
+    return Promise.reject(error.response ? error.response.data : enhancedError);
   }
 );
 

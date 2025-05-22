@@ -27,70 +27,29 @@ export const fetchAllCards = createAsyncThunk(
                         process.env.REACT_APP_USE_MOCK_API === 'true';
                         
       if (useMockApi) {
-        console.log('Sử dụng mock API để lấy tất cả lá bài');
         // Sử dụng getAllCards từ tarotAPI.js
         const mockCards = await getAllCards();
         return mockCards;
       }
       
       // Nếu không sử dụng mock, gọi API thực
-      console.log(`Gọi API: /api/cards`);
+      const response = await apiClient.get('/cards');
       
-      try {
-        // Kiểm tra trạng thái API trước
-        try {
-          console.log('Kiểm tra health API trước khi fetch cards');
-          await apiClient.get('/health', { timeout: 3000 });
-        } catch (healthError) {
-          console.error('API health check thất bại:', healthError);
-          throw new Error('API server không hoạt động');
-        }
-        
-        // Tạo request sử dụng apiClient
-        console.log('Gọi API cards');
-        const response = await apiClient.get('/cards', {
-          timeout: 10000 // 10 giây
-        });
-        console.log('Raw API response for all cards:', response);
-        
-        // Kiểm tra cấu trúc dữ liệu
-        if (response.data && response.data.data && Array.isArray(response.data.data.cards)) {
-          console.log('Kết quả API (cards):', response.data.data.cards);
-          return response.data.data.cards;
-        } else if (response.data && Array.isArray(response.data.data)) {
-          // Trường hợp API trả về data là mảng trực tiếp
-          console.log('Kết quả API (data array):', response.data.data);
-          return response.data.data;
-        } else if (response.data && Array.isArray(response.data)) {
-          // Trường hợp API trả về dữ liệu trực tiếp là mảng
-          console.log('Kết quả API (direct array):', response.data);
-          return response.data;
-        } else {
-          // Không thể tìm thấy dữ liệu cards, log và throw lỗi
-          console.error('Cấu trúc dữ liệu API không khớp (all cards):', response.data);
-          throw new Error('Cấu trúc dữ liệu API không khớp với mong đợi');
-        }
-      } catch (apiError) {
-        console.error('Chi tiết lỗi API call (all cards):', apiError);
-        
-        // Thử chuyển sang dùng mock nếu API thất bại
-        console.log('Chuyển sang dùng mock API sau khi không thể kết nối tới API');
-        localStorage.setItem('USE_MOCK_API', 'true');
-        
-        // Gọi lại API với USE_MOCK_API = true (sử dụng dữ liệu mock)
-        const mockCards = await getAllCards();
-        return mockCards;
+      // Check if the response has the expected structure and extract cards array
+      if (response.data && response.data.data && Array.isArray(response.data.data.cards)) {
+        console.log('Đã nhận được lá bài từ API:', response.data.data.cards.length);
+        return response.data.data.cards;
+      } else if (response.data && Array.isArray(response.data)) {
+        // Some APIs might return the array directly
+        console.log('Đã nhận được lá bài từ API (mảng trực tiếp):', response.data.length);
+        return response.data;
+      } else {
+        console.error('Không tìm thấy mảng cards trong phản hồi API:', response.data);
+        return rejectWithValue({ message: 'Cấu trúc phản hồi API không đúng format' });
       }
     } catch (error) {
-      console.error('Lỗi fetch cards:', error);
-      // Nếu là lỗi CORS hoặc kết nối, hiển thị thông báo rõ ràng hơn
-      if (error.message && (error.message.includes('Network Error') || error.message.includes('CORS'))) {
-        return rejectWithValue({ 
-          message: 'Không thể kết nối đến máy chủ API. Vui lòng kiểm tra kết nối mạng và CORS.',
-          originalError: error.message
-        });
-      }
-      return rejectWithValue(error.response?.data || { message: 'Failed to fetch cards' });
+      console.error('Lỗi khi tải dữ liệu bài Tarot:', error.message || 'Unknown error');
+      return rejectWithValue(error.response?.data || { message: 'Không thể tải dữ liệu bài Tarot' });
     }
   }
 );
@@ -119,88 +78,38 @@ export const fetchDailyTarot = createAsyncThunk(
 
 export const fetchTwelveRandomCards = createAsyncThunk(
   'tarot/fetchTwelveRandomCards',
-  async (_, { rejectWithValue, dispatch }) => {
-    // Định nghĩa hàm retry với delay
-    const fetchWithRetry = async (maxRetries = 3, delay = 1000) => {
-      let lastError;
-      for (let retryCount = 0; retryCount < maxRetries; retryCount++) {
-        try {
-          console.log(`Thử kết nối API lần ${retryCount + 1}...`);
-          
-          // Kiểm tra xem có sử dụng mock API không
-          const useMockApi = localStorage.getItem('USE_MOCK_API') === 'true' || 
-                            process.env.REACT_APP_USE_MOCK_API === 'true';
-                            
-          if (useMockApi) {
-            console.log('Sử dụng mock API để lấy 12 lá bài ngẫu nhiên');
-            // Sử dụng getTwelveRandomCards từ tarotAPI.js
-            const mockCards = await getTwelveRandomCards();
-            return mockCards;
-          }
-          
-          // Nếu không sử dụng mock, gọi API thực
-          console.log(`Gọi API random cards: /api/cards/random?limit=12 (lần ${retryCount + 1})`);
-          
-          // Gọi API với apiClient
-          let response;
-          console.log('Gọi API random cards');
-          response = await apiClient.get('/cards/random?limit=12', {
-            timeout: 5000 * (retryCount + 1) // Tăng timeout cho mỗi lần retry
-          });
-          
-          console.log('Raw API response:', response);
-          
-          // Kiểm tra cấu trúc dữ liệu
-          if (response.data && response.data.data && Array.isArray(response.data.data.cards)) {
-            console.log('Kết quả API random cards (cards):', response.data.data.cards);
-            return response.data.data.cards;
-          } else if (response.data && Array.isArray(response.data.data)) {
-            // Trường hợp API trả về data là mảng trực tiếp
-            console.log('Kết quả API random cards (data array):', response.data.data);
-            return response.data.data;
-          } else if (response.data && Array.isArray(response.data)) {
-            // Trường hợp API trả về dữ liệu trực tiếp là mảng
-            console.log('Kết quả API random cards (direct array):', response.data);
-            return response.data;
-          } else {
-            // Không thể tìm thấy dữ liệu cards, log và throw lỗi
-            console.error('Cấu trúc dữ liệu API không khớp:', response.data);
-            throw new Error('Cấu trúc dữ liệu API không khớp với mong đợi');
-          }
-        } catch (error) {
-          console.error(`Lỗi fetch cards lần ${retryCount + 1}:`, error);
-          lastError = error;
-          
-          // Chờ một chút trước khi thử lại
-          if (retryCount < maxRetries - 1) {
-            console.log(`Đợi ${delay}ms trước khi thử lại...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            // Tăng thời gian delay cho mỗi lần thử lại
-            delay *= 1.5;
-          }
-        }
-      }
-      
-      // Nếu tất cả các lần thử đều thất bại, throw lỗi
-      throw lastError;
-    };
-    
+  async (_, { rejectWithValue }) => {
     try {
-      return await fetchWithRetry();
-    } catch (error) {
-      console.error('Tất cả các lần thử đều thất bại:', error);
-      
-      // Thử chuyển sang dùng mock nếu API thất bại
-      console.log('Chuyển sang dùng mock API sau khi tất cả các lần thử đều thất bại');
-      localStorage.setItem('USE_MOCK_API', 'true');
-      
-      // Gọi lại API với USE_MOCK_API = true
-      try {
+      // Kiểm tra xem có sử dụng mock API không
+      const useMockApi = localStorage.getItem('USE_MOCK_API') === 'true' || 
+                        process.env.REACT_APP_USE_MOCK_API === 'true';
+                        
+      if (useMockApi) {
+        // Sử dụng getTwelveRandomCards từ tarotAPI.js
         const mockCards = await getTwelveRandomCards();
         return mockCards;
-      } catch (mockError) {
-        return rejectWithValue({ message: 'Failed to fetch random cards' });
       }
+      
+      // Nếu không sử dụng mock, gọi API thực
+      const response = await apiClient.get('/cards/random', {
+        params: { limit: 12 }
+      });
+      
+      // Check if the response has the expected structure and extract cards array
+      if (response.data && response.data.data && Array.isArray(response.data.data.cards)) {
+        console.log('Đã nhận được lá bài từ API:', response.data.data.cards.length);
+        return response.data.data.cards;
+      } else if (response.data && Array.isArray(response.data)) {
+        // Some APIs might return the array directly
+        console.log('Đã nhận được lá bài từ API (mảng trực tiếp):', response.data.length);
+        return response.data;
+      } else {
+        console.error('Không tìm thấy mảng cards trong phản hồi API:', response.data);
+        return rejectWithValue({ message: 'Cấu trúc phản hồi API không đúng format' });
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải lá bài ngẫu nhiên:', error.message || 'Unknown error');
+      return rejectWithValue(error.response?.data || { message: 'Không thể tải lá bài ngẫu nhiên' });
     }
   }
 );
@@ -222,45 +131,31 @@ export const performStandardReading = createAsyncThunk(
           readingData.question
         );
         
-        console.log('Đã tạo đọc bài giả lập thành công:', mockReading);
         return mockReading;
       }
 
       // Logic gọi API thực tế
       const { auth } = getState();
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${auth.token}`
-        }
-      };
-
-      // Extract selected cards from the displayed cards
-      const selectedCards = readingData.selectedIndices.map(index => readingData.displayedCards[index]);
       
-      // Map domain to topic_id
-      const domainToTopicMap = {
-        'love': 1,
-        'career': 2,
-        'finance': 3,
-        'health': 4,
-        'spiritual': 5
-      };
+      // Check if token exists to determine if we need to attach auth headers
+      const headers = {};
+      if (auth.token) {
+        headers['Authorization'] = `Bearer ${auth.token}`;
+      }
       
-      const requestData = {
-        topic_id: domainToTopicMap[readingData.domain] || 1,
-        spread_id: 1, // Assuming 3-card spread
-        question: readingData.question || '',
-        cards: selectedCards.map(card => ({
-          id: card.id,
-          is_reversed: Math.random() < 0.3 // 30% chance of reversed
-        }))
-      };
-
-      const response = await apiClient.post('/readings', requestData, config);
-      return response.data.data.reading;
+      const response = await apiClient.post('/tarot/readings', {
+        type: 'standard',
+        cards: readingData.selectedIndices.map(index => readingData.displayedCards[index]),
+        domain: readingData.domain,
+        question: readingData.question
+      }, { headers });
+      
+      return response.data;
     } catch (error) {
-      console.error('Lỗi khi thực hiện đọc bài:', error);
-      return rejectWithValue(error.response?.data || { message: 'Failed to perform reading' });
+      console.error('Error in performStandardReading:', error);
+      return rejectWithValue(
+        error.response?.data || { message: 'Không thể thực hiện bài đọc. Vui lòng thử lại.' }
+      );
     }
   }
 );
@@ -282,45 +177,31 @@ export const performAIReading = createAsyncThunk(
           readingData.question
         );
         
-        console.log('Đã tạo đọc bài AI giả lập thành công:', mockReading);
         return mockReading;
       }
 
-      // Logic gọi API thực tế
+      // Logic gọi API thực tế  
       const { auth } = getState();
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${auth.token}`
-        }
-      };
-
-      // Extract selected cards from the displayed cards
-      const selectedCards = readingData.selectedIndices.map(index => readingData.displayedCards[index]);
       
-      // Map domain to topicId
-      const domainToTopicMap = {
-        'love': 1,
-        'career': 2,
-        'finance': 3,
-        'health': 4,
-        'spiritual': 5
-      };
+      // Check if token exists to determine if we need to attach auth headers
+      const headers = {};
+      if (auth.token) {
+        headers['Authorization'] = `Bearer ${auth.token}`;
+      }
       
-      const requestData = {
-        topicId: domainToTopicMap[readingData.domain] || 1,
-        spreadId: 1, // Assuming 3-card spread
-        question: readingData.question || '',
-        selectedCards: selectedCards.map(card => ({
-          id: card.id,
-          isReversed: Math.random() < 0.3 // 30% chance of reversed
-        }))
-      };
-
-      const response = await apiClient.post('/readings/ai', requestData, config);
-      return response.data.data.reading;
+      const response = await apiClient.post('/readings/ai', {
+        type: 'ai',
+        cards: readingData.selectedIndices.map(index => readingData.displayedCards[index]),
+        domain: readingData.domain,
+        question: readingData.question
+      }, { headers });
+      
+      return response.data;
     } catch (error) {
-      console.error('Lỗi khi thực hiện đọc bài AI:', error);
-      return rejectWithValue(error.response?.data || { message: 'Failed to perform AI reading' });
+      console.error('Error in performAIReading:', error);
+      return rejectWithValue(
+        error.response?.data || { message: 'Không thể thực hiện bài đọc AI. Vui lòng thử lại.' }
+      );
     }
   }
 );
@@ -424,11 +305,19 @@ const tarotSlice = createSlice({
       })
       .addCase(fetchAllCards.fulfilled, (state, action) => {
         state.loading = false;
-        state.cards = action.payload;
+        // Handle both array and nested object response structures
+        if (action.payload && Array.isArray(action.payload)) {
+          state.cards = action.payload;
+        } else if (action.payload && action.payload.data && Array.isArray(action.payload.data.cards)) {
+          state.cards = action.payload.data.cards;
+        } else {
+          console.error('Unexpected payload structure in fetchAllCards:', action.payload);
+          // Keep the previous state if the payload is invalid
+        }
       })
       .addCase(fetchAllCards.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload.message || 'Failed to fetch cards';
+        state.error = action.payload?.message || 'Failed to fetch cards';
       })
       
       // Handle fetchCardById
@@ -466,12 +355,20 @@ const tarotSlice = createSlice({
       })
       .addCase(fetchTwelveRandomCards.fulfilled, (state, action) => {
         state.loading = false;
-        state.twelveCards = action.payload;
+        // Handle both array and nested object response structures
+        if (action.payload && Array.isArray(action.payload)) {
+          state.twelveCards = action.payload;
+        } else if (action.payload && action.payload.data && Array.isArray(action.payload.data.cards)) {
+          state.twelveCards = action.payload.data.cards;
+        } else {
+          console.error('Unexpected payload structure in fetchTwelveRandomCards:', action.payload);
+          // Keep the previous state if the payload is invalid
+        }
         state.selectedIndices = []; // Reset selected cards
       })
       .addCase(fetchTwelveRandomCards.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload.message || 'Failed to fetch random cards';
+        state.error = action.payload?.message || 'Failed to fetch random cards';
       })
       
       // Handle performStandardReading
@@ -488,14 +385,11 @@ const tarotSlice = createSlice({
       })
       .addCase(performStandardReading.rejected, (state, action) => {
         state.loading = false;
-        console.error('Reading error:', action.payload);
         // Kiểm tra nếu là lỗi xác thực và đang sử dụng USE_MOCK_API thì bỏ qua
         const useMockApi = localStorage.getItem('USE_MOCK_API') === 'true';
         if (action.payload && action.payload.message === 'Unauthorized - Invalid token' && useMockApi) {
           // Bỏ qua lỗi xác thực nếu đang sử dụng mock API
           state.error = null;
-          // Giả lập kết quả thành công
-          console.log('Mock API: Bỏ qua lỗi xác thực và tiếp tục với dữ liệu giả lập');
         } else {
           state.error = action.payload?.message || 'Failed to perform reading';
         }
@@ -515,14 +409,11 @@ const tarotSlice = createSlice({
       })
       .addCase(performAIReading.rejected, (state, action) => {
         state.loading = false;
-        console.error('AI reading error:', action.payload);
         // Kiểm tra nếu là lỗi xác thực và đang sử dụng USE_MOCK_API thì bỏ qua
         const useMockApi = localStorage.getItem('USE_MOCK_API') === 'true';
         if (action.payload && action.payload.message === 'Unauthorized - Invalid token' && useMockApi) {
           // Bỏ qua lỗi xác thực nếu đang sử dụng mock API
           state.error = null;
-          // Giả lập kết quả thành công
-          console.log('Mock API: Bỏ qua lỗi xác thực và tiếp tục với dữ liệu giả lập');
         } else {
           state.error = action.payload?.message || 'Failed to perform AI reading';
         }
